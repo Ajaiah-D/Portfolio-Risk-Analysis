@@ -26,4 +26,4 @@ st.write(f"time horizon: {time_horizon} ({time_days} trading days)")
 
 # run analysis button
 if st.sidebar.button("run analysis"):
-    st.success("analysis starting... (connect your backend here)")
+    st.success("analysis starting... (must connect backend")
