@@ -18,4 +18,4 @@ def log_info(msg):
 
 def handle_rate_limit():
     """Sleep to respect Polygon free tier rate limit (5 calls/minute)."""
-    time.sleep(13)  # 60 seconds / 5 calls = 12s, add buffer
+    time.sleep(13)  # 60 seconds / 5 calls = 12s, add buffer this will prevent api time outs
