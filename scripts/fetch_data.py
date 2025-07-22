@@ -82,3 +82,4 @@ if __name__ == "__main__":
 
     meta = fetch_ticker_metadata(ticker)
     print(meta)
+    

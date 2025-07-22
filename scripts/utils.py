@@ -3,7 +3,7 @@ import time
 from dotenv import load_dotenv
 
 # Load environment variables from .env file if present
-load_dotenv()
+load_dotenv(os.path.join(os.path.dirname(__file__), ".env"))
 
 def get_api_key():
     """Load Polygon API key from environment variable."""
