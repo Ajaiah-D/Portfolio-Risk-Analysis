@@ -4,7 +4,7 @@ import pandas as pd
 # path to your database
 DB_PATH = "./data/portfolio_data.db"
 
-ticker = "AAPL"
+ticker = "SPY"
 
 # connect to the database
 conn = sqlite3.connect(DB_PATH)

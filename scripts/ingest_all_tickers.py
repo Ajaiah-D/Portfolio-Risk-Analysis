@@ -6,9 +6,21 @@ def log_info(msg):
     """Simple logger for scripts."""
     print(f"[INFO] {msg}")
 
+ETF_LIST = [
+    # Broad US
+    "SPY", "IVV", "VOO", "VTI", "DIA", "QQQ", "IWM",
+    # Real assets
+    "VNQ", "GLD", "SLV", "DBC",
+    # Sector SPDRs
+    "XLK", "XLF", "XLE", "XLV", "XLY", "XLP", "XLI", "XLB", "XLRE", "XLC",
+    # International
+    "EFA", "VEA", "EEM", "VWO"
+]
+
 def ingest_all_tickers():
-    df = pd.read_csv("tickers/constituents.csv")
-    tickers = df["Symbol"].unique()
+    # df = pd.read_csv("tickers/constituents.csv")
+    # tickers = df["Symbol"].unique()
+    tickers = ETF_LIST
     end_date = "2025-07-18"
     start_date = "2015-07-18"
     failed_tickers = []
@@ -36,3 +48,4 @@ def ingest_all_tickers():
 
 if __name__ == "__main__":
     ingest_all_tickers()
+    
