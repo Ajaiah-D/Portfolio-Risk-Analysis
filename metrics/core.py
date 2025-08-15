@@ -55,13 +55,18 @@ def compute_asset_metrics(price_df, benchmark_ticker, risk_free_rate=0.0):
     results = {}
     for ticker in returns.columns:
         r = returns[ticker].dropna()
+        if ticker != benchmark_ticker:
+            aligned = pd.concat([r, benchmark], axis=1).dropna()
+            b = beta(aligned.iloc[:, 0], aligned.iloc[:, 1])
+        else:
+            b = np.nan
         results[ticker] = {
-            "Sharpe": sharpe_ratio(r, risk_free_rate),
-            "Sortino": sortino_ratio(r, risk_free_rate),
-            "Beta": beta(r, benchmark) if ticker != benchmark_ticker else np.nan,
-            "MaxDrawdown": max_drawdown(r),
-            "VaR": var_historical(r),
-            "CVaR": cvar_historical(r),
+            "Sharpe": sharpe_ratio(r.dropna(), risk_free_rate),
+            "Sortino": sortino_ratio(r.dropna(), risk_free_rate),
+            "Beta": b,
+            "MaxDrawdown": max_drawdown(r.dropna()),
+            "VaR": var_historical(r.dropna()),
+            "CVaR": cvar_historical(r.dropna()),
         }
     return pd.DataFrame(results).T
 
@@ -69,13 +74,14 @@ def compute_portfolio_metrics(price_df, weights, benchmark_ticker, risk_free_rat
     returns = _daily_returns(price_df)
     port_r = portfolio_return_series(returns, np.array(weights))
     bench_r = returns[benchmark_ticker]
+    aligned = pd.concat([port_r, bench_r], axis=1).dropna()
     metrics = {
-        "Sharpe": sharpe_ratio(port_r, risk_free_rate),
-        "Sortino": sortino_ratio(port_r, risk_free_rate),
-        "Beta": beta(port_r, bench_r),
-        "MaxDrawdown": max_drawdown(port_r),
-        "VaR": var_historical(port_r),
-        "CVaR": cvar_historical(port_r),
+        "Sharpe": sharpe_ratio(port_r.dropna(), risk_free_rate),
+        "Sortino": sortino_ratio(port_r.dropna(), risk_free_rate),
+        "Beta": beta(aligned.iloc[:, 0], aligned.iloc[:, 1]),
+        "MaxDrawdown": max_drawdown(port_r.dropna()),
+        "VaR": var_historical(port_r.dropna()),
+        "CVaR": cvar_historical(port_r.dropna()),
     }
     corr = correlation_matrix(returns)
     return metrics, corr
