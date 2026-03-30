@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python -c \"import sqlite3; conn = sqlite3.connect\\(''data/portfolio_data.db''\\); cursor = conn.cursor\\(\\); cursor.execute\\(\"\"SELECT name FROM sqlite_master WHERE type=''table''\"\"\\); print\\(cursor.fetchall\\(\\)\\); cursor.execute\\(''SELECT COUNT\\(*\\) FROM daily_prices''\\); print\\(''daily_prices rows:'', cursor.fetchone\\(\\)\\); cursor.execute\\(''SELECT COUNT\\(*\\) FROM tickers_meta''\\); print\\(''tickers_meta rows:'', cursor.fetchone\\(\\)\\); cursor.execute\\(''PRAGMA table_info\\(daily_prices\\)''\\); print\\(''daily_prices schema:'', cursor.fetchall\\(\\)\\); cursor.execute\\(''PRAGMA table_info\\(tickers_meta\\)''\\); print\\(''tickers_meta schema:'', cursor.fetchall\\(\\)\\); conn.close\\(\\)\")",
+      "Bash(pip list:*)",
+      "Bash(pip install:*)"
+    ]
+  }
+}
