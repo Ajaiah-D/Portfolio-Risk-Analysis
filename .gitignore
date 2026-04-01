@@ -1,1 +1,22 @@
 scripts/.env
+
+# Database — generated data, too large for GitHub
+data/portfolio_data.db
+
+# Logs from ingestion scripts
+data/backfill.log
+data/backfill_yf.log
+data/failed_tickers.txt
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# Streamlit
+.streamlit/secrets.toml
+
+# OS
+.DS_Store
+Thumbs.db
