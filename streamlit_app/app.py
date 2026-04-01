@@ -254,10 +254,23 @@ hr.section-rule {{
 .mcard-rule {{ border: none; border-top: 1px solid var(--border); margin: 0.5rem 0; }}
 .mcard-desc {{ font-size: 0.77rem; color: var(--text2); line-height: 1.45; }}
 .mcard-ranges {{
-    font-size: 0.68rem; color: var(--text2); opacity: 0.75;
+    display: flex; flex-wrap: wrap; gap: 0.28rem;
     margin-top: 0.5rem; padding-top: 0.45rem;
     border-top: 1px dashed var(--border);
-    line-height: 1.55;
+}}
+.rtag {{
+    font-size: 0.63rem; padding: 0.13rem 0.42rem;
+    border-radius: 4px; white-space: nowrap; line-height: 1.5;
+}}
+.rtag-bg {{ background: var(--good-dim);    color: var(--good);    }}
+.rtag-by {{ background: var(--warn-dim);    color: var(--warn);    }}
+.rtag-br {{ background: var(--risk-dim);    color: var(--risk);    }}
+.rtag-bb {{ background: var(--neutral-dim); color: var(--neutral); }}
+.rtag-bp {{ background: var(--pink-dim);    color: var(--pink);    }}
+
+/* ── Dataframe toolbar (three-dot menu) — base ── */
+[data-testid="stElementToolbar"] {{
+    background: var(--bg2) !important;
 }}
 
 /* ── Sidebar label style ── */
@@ -270,6 +283,74 @@ hr.section-rule {{
 """,
     unsafe_allow_html=True,
 )
+
+# ── Dark-mode toolbar fix (hard-coded to avoid CSS-variable scoping issues) ───
+# Popovers render in a separate stacking context where :root vars may not resolve.
+if dark:
+    st.markdown(
+        """
+<style>
+[data-testid="stElementToolbarButton"] svg,
+[data-testid="stElementToolbarButton"] button,
+[data-testid="stElementToolbar"] svg,
+[data-testid="stHeader"] svg,
+[data-testid="stToolbar"] svg {
+    color:  #e8e8e8 !important;
+    fill:   #e8e8e8 !important;
+    stroke: #e8e8e8 !important;
+    opacity: 1 !important;
+}
+[data-testid="stBasePopoverContent"] {
+    background-color: #1c1c1c !important;
+    border: 1px solid #2a2a2a !important;
+}
+[data-testid="stBasePopoverContent"] *,
+[data-testid="stBasePopoverContent"] li,
+[data-testid="stBasePopoverContent"] button,
+[data-testid="stBasePopoverContent"] span,
+[data-testid="stBasePopoverContent"] p {
+    background-color: #1c1c1c !important;
+    color: #e8e8e8 !important;
+}
+[data-testid="stBasePopoverContent"] li:hover,
+[data-testid="stBasePopoverContent"] button:hover {
+    background-color: #2a2a2a !important;
+}
+</style>
+""",
+        unsafe_allow_html=True,
+    )
+else:
+    st.markdown(
+        """
+<style>
+[data-testid="stElementToolbarButton"] svg,
+[data-testid="stElementToolbar"] svg {
+    color:  #444444 !important;
+    fill:   #444444 !important;
+    stroke: #444444 !important;
+    opacity: 1 !important;
+}
+[data-testid="stBasePopoverContent"] {
+    background-color: #f7f7f7 !important;
+    border: 1px solid #e5e5e5 !important;
+}
+[data-testid="stBasePopoverContent"] *,
+[data-testid="stBasePopoverContent"] li,
+[data-testid="stBasePopoverContent"] button,
+[data-testid="stBasePopoverContent"] span,
+[data-testid="stBasePopoverContent"] p {
+    background-color: #f7f7f7 !important;
+    color: #111111 !important;
+}
+[data-testid="stBasePopoverContent"] li:hover,
+[data-testid="stBasePopoverContent"] button:hover {
+    background-color: #eeeeee !important;
+}
+</style>
+""",
+        unsafe_allow_html=True,
+    )
 
 # ── Cached data loaders ───────────────────────────────────────────────────────
 @st.cache_data
@@ -363,20 +444,59 @@ METRIC_DISPLAY = {
     "Sharpe": "Sharpe Ratio", "Sortino": "Sortino Ratio", "Beta": "Beta",
     "MaxDrawdown": "Max Drawdown", "VaR": "Value at Risk (5%)", "CVaR": "CVaR / Exp. Shortfall",
 }
+# Each entry: list of (badge_class, range_label, rating_label)
 METRIC_RANGES = {
-    "Sharpe":
-        "< 0 = negative &nbsp;·&nbsp; 0–0.5 = weak &nbsp;·&nbsp; 0.5–1 = acceptable &nbsp;·&nbsp; > 1 = strong &nbsp;·&nbsp; > 2 = exceptional",
-    "Sortino":
-        "< 0 = poor &nbsp;·&nbsp; 0–0.5 = limited &nbsp;·&nbsp; 0.5–1 = moderate &nbsp;·&nbsp; > 1 = good &nbsp;·&nbsp; > 2 = excellent",
-    "Beta":
-        "< 0 = inverse &nbsp;·&nbsp; 0–0.5 = very defensive &nbsp;·&nbsp; 0.8–1.2 = market-like &nbsp;·&nbsp; > 1.5 = very aggressive",
-    "MaxDrawdown":
-        "> −5% = minimal &nbsp;·&nbsp; −5 to −15% = low &nbsp;·&nbsp; −15 to −25% = moderate &nbsp;·&nbsp; −25 to −40% = severe &nbsp;·&nbsp; < −40% = extreme",
-    "VaR":
-        "Daily worst-case (5th pct): < 1.5% = low &nbsp;·&nbsp; 1.5–2.5% = moderate &nbsp;·&nbsp; 2.5–3.5% = elevated &nbsp;·&nbsp; > 3.5% = high",
-    "CVaR":
-        "Avg loss on worst days: < 2% = low &nbsp;·&nbsp; 2–3% = moderate &nbsp;·&nbsp; 3–4.5% = elevated &nbsp;·&nbsp; > 4.5% = severe",
+    "Sharpe": [
+        ("br", "< 0",    "Negative"),
+        ("by", "0–0.5",  "Weak"),
+        ("by", "0.5–1",  "Acceptable"),
+        ("bg", "> 1",    "Strong"),
+        ("bg", "> 2",    "Exceptional"),
+    ],
+    "Sortino": [
+        ("br", "< 0",    "Poor"),
+        ("by", "0–0.5",  "Limited"),
+        ("by", "0.5–1",  "Moderate"),
+        ("bg", "> 1",    "Good"),
+        ("bg", "> 2",    "Excellent"),
+    ],
+    "Beta": [
+        ("bp", "< 0",      "Inverse"),
+        ("bg", "0–0.5",    "Defensive"),
+        ("by", "0.8–1.2",  "Market-like"),
+        ("by", "1.2–1.5",  "Aggressive"),
+        ("br", "> 1.5",    "Very Aggressive"),
+    ],
+    "MaxDrawdown": [
+        ("bg", "> −5%",    "Minimal"),
+        ("bg", "−5–15%",   "Low"),
+        ("by", "−15–25%",  "Moderate"),
+        ("by", "−25–40%",  "Severe"),
+        ("br", "< −40%",   "Extreme"),
+    ],
+    "VaR": [
+        ("bg", "< 1.5%",   "Low"),
+        ("by", "1.5–2.5%", "Moderate"),
+        ("by", "2.5–3.5%", "Elevated"),
+        ("br", "> 3.5%",   "High"),
+    ],
+    "CVaR": [
+        ("bg", "< 2%",     "Low"),
+        ("by", "2–3%",     "Moderate"),
+        ("by", "3–4.5%",   "Elevated"),
+        ("br", "> 4.5%",   "Severe"),
+    ],
 }
+
+def _ranges_html(key):
+    tags = METRIC_RANGES.get(key, [])
+    if not tags:
+        return ""
+    items = "".join(
+        f'<span class="rtag rtag-{cls}"><b>{rng}</b>&nbsp;{lbl}</span>'
+        for cls, rng, lbl in tags
+    )
+    return f'<div class="mcard-ranges">{items}</div>'
 
 # ── Render a portfolio metric card ────────────────────────────────────────────
 def metric_card_html(key, value):
@@ -385,8 +505,6 @@ def metric_card_html(key, value):
     val_str = "—" if pd.isna(value) else (
         f"{value * 100:.2f}%" if key in PCT_METRICS else f"{value:.3f}"
     )
-    ranges = METRIC_RANGES.get(key, "")
-    ranges_html = f'<div class="mcard-ranges">{ranges}</div>' if ranges else ""
     return (
         f'<div class="mcard">'
         f'  <div class="mcard-label">{label}</div>'
@@ -394,16 +512,15 @@ def metric_card_html(key, value):
         f'  <span class="mcard-badge {cls}">{badge}</span>'
         f'  <hr class="mcard-rule"/>'
         f'  <div class="mcard-desc">{desc}</div>'
-        f'  {ranges_html}'
+        f'  {_ranges_html(key)}'
         f'</div>'
     )
 
 # ── Asset table styling ───────────────────────────────────────────────────────
-def _c(v, good_thresh, warn_thresh, invert=False):
+def _c(v, good_thresh, warn_thresh):
     if pd.isna(v): return "color: #8b8cf8"
-    cmp = -v if invert else v
-    if cmp >= good_thresh: return "color: #10b981; font-weight: 600"
-    if cmp >= warn_thresh: return "color: #f59e0b"
+    if v >= good_thresh: return "color: #10b981; font-weight: 600"
+    if v >= warn_thresh: return "color: #f59e0b"
     return "color: #f43f5e"
 
 def col_beta(v):
@@ -411,6 +528,20 @@ def col_beta(v):
     if 0.8 <= v <= 1.2: return "color: #f59e0b"
     if v < 0.8:         return "color: #10b981; font-weight: 600"
     if v <= 1.5:        return "color: #f59e0b"
+    return "color: #f43f5e"
+
+def col_drawdown(v):
+    # v is negative; closer to 0 is better
+    if pd.isna(v): return "color: #8b8cf8"
+    if v > -0.10:  return "color: #10b981; font-weight: 600"
+    if v > -0.25:  return "color: #f59e0b"
+    return "color: #f43f5e"
+
+def col_var(v):
+    # v is negative; closer to 0 is better
+    if pd.isna(v): return "color: #8b8cf8"
+    if v > -0.015: return "color: #10b981; font-weight: 600"
+    if v > -0.025: return "color: #f59e0b"
     return "color: #f43f5e"
 
 def corr_cell_css(v):
@@ -426,9 +557,9 @@ COL_FNS = {
     "Sharpe":      lambda v: _c(v, 1.0, 0.5),
     "Sortino":     lambda v: _c(v, 1.0, 0.5),
     "Beta":        col_beta,
-    "MaxDrawdown": lambda v: _c(v, -0.10, -0.25, invert=True),
-    "VaR":         lambda v: _c(v, -0.015, -0.025, invert=True),
-    "CVaR":        lambda v: _c(v, -0.015, -0.025, invert=True),
+    "MaxDrawdown": col_drawdown,
+    "VaR":         col_var,
+    "CVaR":        col_var,
 }
 
 def style_asset_table(df):
@@ -659,7 +790,7 @@ with st.sidebar:
         options=stock_options,
         default=[],
         placeholder="Type to search…",
-        max_selections=9,
+        max_selections=25,
         label_visibility="collapsed",
     )
 
@@ -726,7 +857,7 @@ if not chosen:
 
 if "SPY" not in chosen:
     chosen.insert(0, "SPY")
-tickers_list = chosen[:10]
+tickers_list = chosen[:29]  # 29 user picks + SPY = 30 (helpers.py cap)
 
 # ── Fetch + compute ───────────────────────────────────────────────────────────
 with st.spinner("Fetching data and computing metrics…"):
