@@ -10,8 +10,8 @@ def get_price_data(tickers, start_date, end_date):
     """
     if not tickers:
         raise ValueError("Tickers list cannot be empty.")
-    if len(tickers) > 10:
-        raise ValueError("Max 10 tickers allowed per query for performance/safety.")
+    if len(tickers) > 30:
+        raise ValueError("Max 30 tickers allowed per query.")
 
     placeholders = ','.join(['?'] * len(tickers))
     query = f"""
