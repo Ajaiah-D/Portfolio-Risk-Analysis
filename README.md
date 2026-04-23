@@ -1,6 +1,6 @@
 # Portfolio Risk Analysis
 
-An interactive portfolio risk dashboard built with Streamlit, backed by a local SQLite database of historical price data sourced from Polygon.io and yfinance.
+An interactive portfolio risk dashboard built with Streamlit, backed by a local SQLite database of historical price data sourced from Massive.com (formerly Polygon.io) and yfinance.
 
 ---
 
@@ -22,8 +22,8 @@ An interactive portfolio risk dashboard built with Streamlit, backed by a local 
 ## Architecture
 
 ```
-Polygon.io API ──► fetch_data.py ──► store_data.py ──► SQLite (daily_prices, tickers_meta)
-yfinance       ──► backfill_yfinance.py ──────────────► SQLite (gap fill only)
+Massive.com API ──► fetch_data.py ──► store_data.py ──► SQLite (daily_prices, tickers_meta)
+yfinance        ──► backfill_yfinance.py ─────────────► SQLite (gap fill only)
 
 SQLite ──► data/helpers.py ──► metrics/core.py ──► streamlit_app/app.py ──► Browser
 ```
@@ -36,7 +36,7 @@ Data is ingested once (or re-run to refresh) and stored locally. The Streamlit a
 
 **Idempotent ingestion** — both backfill scripts use `INSERT OR IGNORE` against a `(ticker, date)` unique constraint, so they can be interrupted and re-run without duplicates.
 
-**Dual data sources for history** — Polygon's free tier returns limited history per call (rate-limited at 5 req/min with a 13s sleep). A separate yfinance backfill script fills gaps back to 2020-01-01 with no enforced rate limit, using a shorter 0.5s courtesy sleep.
+**Dual data sources for history** — Massive.com's free tier returns limited history per call (rate-limited at 5 req/min with a 13s sleep). A separate yfinance backfill script fills gaps back to 2020-01-01 with no enforced rate limit, using a shorter 0.5s courtesy sleep.
 
 **Parameterized SQL with dynamic `IN` clause** — `helpers.get_price_data` builds `IN (?,?,?)` by joining `?` placeholders, never interpolating user input into the query string.
 
@@ -74,7 +74,7 @@ All metrics are computed from daily percentage returns over the selected time wi
 
 ## Setup
 
-**Prerequisites:** Python 3.10+, a Polygon.io API key (free tier works).
+**Prerequisites:** Python 3.10+, a Massive.com API key (free tier works; formerly Polygon.io — existing keys still work).
 
 ```bash
 # 1. Clone and install dependencies
@@ -109,7 +109,7 @@ streamlit run streamlit_app/app.py
 │   ├── helpers.py              # Parameterized SQLite query layer
 │   └── portfolio_data.db       # Local price database (git-ignored)
 ├── scripts/
-│   ├── fetch_data.py           # Polygon.io API client
+│   ├── fetch_data.py           # Massive.com API client (formerly Polygon.io)
 │   ├── store_data.py           # SQLite write functions
 │   ├── ingest_all_tickers.py   # Initial ingestion for S&P 500 + ETF list
 │   ├── backfill_history.py     # Extends history via Polygon (rate-limited)
@@ -132,7 +132,7 @@ streamlit run streamlit_app/app.py
 | Charts | Plotly |
 | Data manipulation | pandas, NumPy |
 | Database | SQLite (via `sqlite3`) |
-| Primary data source | Polygon.io REST API |
+| Primary data source | Massive.com REST API (formerly Polygon.io) |
 | Backfill data source | yfinance |
 | Styling | CSS custom properties injected via `st.markdown` |
 | Language | Python 3.10+ |
