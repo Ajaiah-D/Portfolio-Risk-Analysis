@@ -75,6 +75,19 @@ hr.section-rule {{ border: none; border-top: 1px solid var(--border); margin: 0.
 </style>
 """, unsafe_allow_html=True)
 
+# ── Sidebar ──
+with st.sidebar:
+    toggle_col, _ = st.columns([1, 0.01])
+    with toggle_col:
+        new_dark = st.toggle(
+            "Dark mode",
+            value=st.session_state.get("dark_mode", False),
+            key="dark_toggle",
+        )
+    if new_dark != st.session_state.get("dark_mode", False):
+        st.session_state.dark_mode = new_dark
+        st.rerun()
+
 # ── Header ──
 st.markdown('<h1 class="hero-title">Financial <span>Glossary</span></h1>', unsafe_allow_html=True)
 st.markdown(
