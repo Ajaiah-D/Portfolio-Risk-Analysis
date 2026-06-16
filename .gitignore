@@ -6,6 +6,7 @@ data/portfolio_data.db
 # Logs from ingestion scripts
 data/backfill.log
 data/backfill_yf.log
+data/refresh.log
 data/failed_tickers.txt
 
 # Python

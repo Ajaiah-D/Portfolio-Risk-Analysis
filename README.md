@@ -93,7 +93,7 @@ python scripts/backfill_history.py      # via Polygon (slower, rate-limited)
 python scripts/backfill_yfinance.py     # via yfinance (faster, fills gaps)
 
 # 5. Run the app
-streamlit run streamlit_app/app.py
+python -m streamlit run streamlit_app/Portfolio_Analyzer.py
 ```
 
 ---
@@ -102,7 +102,9 @@ streamlit run streamlit_app/app.py
 
 ```
 ├── streamlit_app/
-│   └── app.py                  # All UI, chart builders, metric card rendering
+│   ├── Portfolio_Analyzer.py   # All UI, chart builders, metric card rendering
+│   └── pages/
+│       └── Glossary.py         # Plain-English definitions of every financial term
 ├── metrics/
 │   └── core.py                 # Pure-function metric computations (Sharpe, VaR, etc.)
 ├── data/
