@@ -1,14 +1,16 @@
-import streamlit as st
 import datetime
 import sqlite3
-import pandas as pd
-import numpy as np
 import sys
-import plotly.graph_objects as go
+
+import numpy as np
+import pandas as pd
+import streamlit as st
 
 sys.path.insert(0, ".")
 from data import helpers
-from metrics import core
+from metrics import core, optimize
+from streamlit_app import charts, insights, interpret, style
+from streamlit_app.interpret import metric_card_html, style_asset_table, corr_cell_css
 
 # ── Page config ───────────────────────────────────────────────────────────────
 st.set_page_config(
@@ -23,334 +25,7 @@ if "dark_mode" not in st.session_state:
     st.session_state.dark_mode = False
 
 dark = st.session_state.dark_mode
-
-# ── CSS variables (swapped by dark mode) ─────────────────────────────────────
-if dark:
-    _vars = """
-    --bg:      #0c0c0c;
-    --bg2:     #141414;
-    --bg3:     #1c1c1c;
-    --text:    #f0f0f0;
-    --text2:   #888888;
-    --border:  #272727;
-    --card:    #141414;
-    --shadow:  rgba(0,0,0,0.35);
-    """
-else:
-    _vars = """
-    --bg:      #ffffff;
-    --bg2:     #f7f7f7;
-    --bg3:     #eeeeee;
-    --text:    #111111;
-    --text2:   #666666;
-    --border:  #e5e5e5;
-    --card:    #ffffff;
-    --shadow:  rgba(0,0,0,0.06);
-    """
-
-st.markdown(
-    f"""
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-
-:root {{ {_vars}
-    --pink:       #fc88e5;
-    --pink-dim:   rgba(252,136,229,0.12);
-    --good:       #10b981;
-    --good-dim:   rgba(16,185,129,0.13);
-    --warn:       #f59e0b;
-    --warn-dim:   rgba(245,158,11,0.13);
-    --risk:       #f43f5e;
-    --risk-dim:   rgba(244,63,94,0.13);
-    --neutral:    #8b8cf8;
-    --neutral-dim:rgba(139,140,248,0.13);
-}}
-
-html, body, [class*="css"] {{ font-family: 'Inter', sans-serif; }}
-#MainMenu, footer {{ visibility: hidden; }}
-.block-container {{ padding-top: 2rem; padding-bottom: 3rem; max-width: 1200px; }}
-
-/* ── Global text colour (follows theme) ── */
-p, span, label, div, h1, h2, h3, h4, li, caption,
-[data-testid="stWidgetLabel"],
-[data-testid="stWidgetLabel"] p,
-[data-testid="stMarkdownContainer"] p,
-.stMarkdown p,
-.stRadio label, .stRadio span,
-.stCheckbox label, .stCheckbox span,
-.stSelectbox label,
-.stMultiSelect label,
-.stSlider label,
-.stTextInput label,
-.stCaption,
-[data-testid="stCaptionContainer"] p {{
-    color: var(--text) !important;
-}}
-
-/* ── Sidebar widget backgrounds & inputs ── */
-[data-testid="stSidebar"] input,
-[data-testid="stSidebar"] textarea,
-[data-baseweb="input"],
-[data-baseweb="textarea"],
-[data-baseweb="select"] div,
-[data-baseweb="popover"] li,
-[data-testid="stMultiSelect"] [data-baseweb="tag"] {{
-    background-color: var(--bg3) !important;
-    color: var(--text) !important;
-}}
-
-/* ── Multiselect dropdown list ── */
-[data-baseweb="menu"],
-[data-baseweb="menu"] li,
-[data-baseweb="popover"],
-[role="listbox"],
-[role="option"] {{
-    background-color: var(--bg2) !important;
-    color: var(--text) !important;
-}}
-[role="option"]:hover {{
-    background-color: var(--bg3) !important;
-}}
-
-/* ── Multiselect tags ── */
-[data-testid="stMultiSelect"] span[data-baseweb="tag"] {{
-    background-color: var(--pink-dim) !important;
-    color: var(--pink) !important;
-}}
-[data-testid="stMultiSelect"] span[data-baseweb="tag"] span {{
-    color: var(--pink) !important;
-}}
-
-/* ── Radio buttons ── */
-[data-testid="stRadio"] div[role="radiogroup"] label {{
-    color: var(--text) !important;
-}}
-
-/* ── Slider track label & value ── */
-[data-testid="stSlider"] div[data-testid="stTickBarMin"],
-[data-testid="stSlider"] div[data-testid="stTickBarMax"],
-[data-testid="stSlider"] p {{
-    color: var(--text2) !important;
-}}
-
-/* ── Info / warning banners ── */
-[data-testid="stAlert"] p {{
-    color: var(--text) !important;
-}}
-
-/* ── App background ── */
-.stApp,
-[data-testid="stAppViewContainer"],
-[data-testid="stAppViewContainer"] > section {{
-    background-color: var(--bg) !important;
-}}
-
-/* ── Top toolbar bar ── */
-[data-testid="stHeader"],
-.stAppHeader,
-header[data-testid="stHeader"] {{
-    background-color: var(--bg) !important;
-    border-bottom: 1px solid var(--border) !important;
-}}
-
-/* ── Toolbar buttons visibility in dark mode ── */
-[data-testid="stHeader"] button,
-[data-testid="stHeader"] a,
-[data-testid="stToolbar"] button,
-[data-testid="stToolbar"] svg {{
-    color: var(--text) !important;
-    fill: var(--text) !important;
-    opacity: 1 !important;
-}}
-
-/* ── Sidebar ── */
-[data-testid="stSidebar"] {{
-    background-color: var(--bg2) !important;
-    border-right: 1px solid var(--border);
-}}
-
-/* ── Typography ── */
-.hero-title {{
-    font-size: 2rem; font-weight: 700; color: var(--text);
-    letter-spacing: -0.5px; margin: 0 0 0.35rem 0;
-}}
-.hero-title span {{ color: var(--pink); }}
-.hero-sub {{
-    font-size: 0.9rem; color: var(--text2);
-    margin: 0 0 1.8rem 0; line-height: 1.6;
-}}
-
-/* ── Section headers ── */
-.section-title {{
-    font-size: 0.72rem; font-weight: 700;
-    text-transform: uppercase; letter-spacing: 0.1em;
-    color: var(--pink);
-    margin: 2.4rem 0 0.25rem 0;
-}}
-.section-heading {{
-    font-size: 1.05rem; font-weight: 600; color: var(--text);
-    margin: 0 0 0.3rem 0;
-}}
-.section-desc {{
-    font-size: 0.8rem; color: var(--text2);
-    margin: 0 0 1.1rem 0; line-height: 1.55;
-}}
-hr.section-rule {{
-    border: none; border-top: 1px solid var(--border); margin: 0.5rem 0 1.2rem 0;
-}}
-
-/* ── Info bar ── */
-.info-bar {{
-    background: var(--bg2);
-    border: 1px solid var(--border);
-    border-left: 3px solid var(--pink);
-    border-radius: 10px;
-    padding: 0.85rem 1.15rem;
-    margin-bottom: 1.6rem;
-    font-size: 0.82rem; color: var(--text2); line-height: 1.8;
-}}
-.info-bar b {{ color: var(--text); font-weight: 600; }}
-
-/* ── Chips ── */
-.chip {{
-    display: inline-block;
-    background: var(--bg3); border: 1px solid var(--border);
-    border-radius: 5px; padding: 0.12rem 0.5rem;
-    font-size: 0.75rem; font-weight: 600; color: var(--text2); margin: 0.1rem;
-}}
-.chip-bench {{
-    background: var(--pink-dim); border-color: var(--pink); color: var(--pink);
-}}
-
-/* ── Metric cards ── */
-.mcard {{
-    background: var(--card);
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 1.1rem 1.2rem;
-    box-shadow: 0 1px 4px var(--shadow);
-    margin-bottom: 0.55rem;
-}}
-.mcard-label {{
-    font-size: 0.67rem; font-weight: 700;
-    text-transform: uppercase; letter-spacing: 0.1em;
-    color: var(--text2); margin-bottom: 0.3rem;
-}}
-.mcard-val {{
-    font-size: 1.75rem; font-weight: 700; color: var(--text);
-    line-height: 1; margin-bottom: 0.4rem;
-}}
-.mcard-badge {{
-    display: inline-block; padding: 0.15rem 0.55rem;
-    border-radius: 20px; font-size: 0.67rem; font-weight: 700;
-    text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.5rem;
-}}
-.bg {{ background: var(--good-dim);    color: var(--good);    }}
-.by {{ background: var(--warn-dim);    color: var(--warn);    }}
-.br {{ background: var(--risk-dim);    color: var(--risk);    }}
-.bb {{ background: var(--neutral-dim); color: var(--neutral); }}
-.bp {{ background: var(--pink-dim);    color: var(--pink);    }}
-
-.mcard-rule {{ border: none; border-top: 1px solid var(--border); margin: 0.5rem 0; }}
-.mcard-desc {{ font-size: 0.77rem; color: var(--text2); line-height: 1.45; }}
-.mcard-ranges {{
-    display: flex; flex-wrap: wrap; gap: 0.28rem;
-    margin-top: 0.5rem; padding-top: 0.45rem;
-    border-top: 1px dashed var(--border);
-}}
-.rtag {{
-    font-size: 0.63rem; padding: 0.13rem 0.42rem;
-    border-radius: 4px; white-space: nowrap; line-height: 1.5;
-}}
-.rtag-bg {{ background: var(--good-dim);    color: var(--good);    }}
-.rtag-by {{ background: var(--warn-dim);    color: var(--warn);    }}
-.rtag-br {{ background: var(--risk-dim);    color: var(--risk);    }}
-.rtag-bb {{ background: var(--neutral-dim); color: var(--neutral); }}
-.rtag-bp {{ background: var(--pink-dim);    color: var(--pink);    }}
-
-/* ── Dataframe toolbar (three-dot menu) — base ── */
-[data-testid="stElementToolbar"] {{
-    background: var(--bg2) !important;
-}}
-
-/* ── Sidebar label style ── */
-.sb-label {{
-    font-size: 0.7rem; font-weight: 700;
-    text-transform: uppercase; letter-spacing: 0.09em;
-    color: var(--text2); margin-bottom: 0.25rem; display: block;
-}}
-</style>
-""",
-    unsafe_allow_html=True,
-)
-
-# ── Dark-mode toolbar fix (hard-coded to avoid CSS-variable scoping issues) ───
-# Popovers render in a separate stacking context where :root vars may not resolve.
-if dark:
-    st.markdown(
-        """
-<style>
-[data-testid="stElementToolbarButton"] svg,
-[data-testid="stElementToolbarButton"] button,
-[data-testid="stElementToolbar"] svg,
-[data-testid="stHeader"] svg,
-[data-testid="stToolbar"] svg {
-    color:  #e8e8e8 !important;
-    fill:   #e8e8e8 !important;
-    stroke: #e8e8e8 !important;
-    opacity: 1 !important;
-}
-[data-testid="stBasePopoverContent"] {
-    background-color: #1c1c1c !important;
-    border: 1px solid #2a2a2a !important;
-}
-[data-testid="stBasePopoverContent"] *,
-[data-testid="stBasePopoverContent"] li,
-[data-testid="stBasePopoverContent"] button,
-[data-testid="stBasePopoverContent"] span,
-[data-testid="stBasePopoverContent"] p {
-    background-color: #1c1c1c !important;
-    color: #e8e8e8 !important;
-}
-[data-testid="stBasePopoverContent"] li:hover,
-[data-testid="stBasePopoverContent"] button:hover {
-    background-color: #2a2a2a !important;
-}
-</style>
-""",
-        unsafe_allow_html=True,
-    )
-else:
-    st.markdown(
-        """
-<style>
-[data-testid="stElementToolbarButton"] svg,
-[data-testid="stElementToolbar"] svg {
-    color:  #444444 !important;
-    fill:   #444444 !important;
-    stroke: #444444 !important;
-    opacity: 1 !important;
-}
-[data-testid="stBasePopoverContent"] {
-    background-color: #f7f7f7 !important;
-    border: 1px solid #e5e5e5 !important;
-}
-[data-testid="stBasePopoverContent"] *,
-[data-testid="stBasePopoverContent"] li,
-[data-testid="stBasePopoverContent"] button,
-[data-testid="stBasePopoverContent"] span,
-[data-testid="stBasePopoverContent"] p {
-    background-color: #f7f7f7 !important;
-    color: #111111 !important;
-}
-[data-testid="stBasePopoverContent"] li:hover,
-[data-testid="stBasePopoverContent"] button:hover {
-    background-color: #eeeeee !important;
-}
-</style>
-""",
-        unsafe_allow_html=True,
-    )
+style.inject_css(dark)
 
 # ── Cached data loaders ───────────────────────────────────────────────────────
 @st.cache_data
@@ -370,10 +45,11 @@ def load_universe():
     const["label"] = const["Symbol"] + "  —  " + const["Security"]
     const = const.sort_values("Symbol").reset_index(drop=True)
 
-    # ETFs (in DB but not S&P 500)
+    # ETFs (in DB but not S&P 500). SPY is offered too — it's always the
+    # benchmark, but users can also hold it as a position.
     sp500_syms = set(const["Symbol"])
     etf_rows = []
-    for sym in sorted(db_tickers - sp500_syms - {"SPY"}):
+    for sym in sorted(db_tickers - sp500_syms):
         name = meta_dict.get(sym, sym)
         label = f"{sym}  —  {name}" if name and name != sym else sym
         etf_rows.append({"symbol": sym, "label": label})
@@ -383,532 +59,83 @@ def load_universe():
     return const, etfs, sectors
 
 
-PCT_METRICS = {"MaxDrawdown", "VaR", "CVaR"}  # kept for asset table formatting
-
-# ── Interpretation logic ──────────────────────────────────────────────────────
-def interpret_sharpe(v):
-    if pd.isna(v): return "bb", "Benchmark", "SPY is used as the market benchmark."
-    if v >= 2.0:   return "bg", "Exceptional", "Returns far exceed the risk taken — rare and highly desirable."
-    if v >= 1.0:   return "bg", "Strong", "Each unit of risk is well compensated. Above 1 is considered solid."
-    if v >= 0.5:   return "by", "Acceptable", "Moderate returns relative to volatility — room to improve."
-    if v >= 0.0:   return "by", "Weak", "Returns barely compensate for the risk being taken."
-    return "br", "Negative", "Losing value relative to the risk-free rate — risk goes unrewarded."
-
-def interpret_sortino(v):
-    if pd.isna(v): return "bb", "Benchmark", "SPY is used as the market benchmark."
-    if v >= 2.0:   return "bg", "Excellent", "Strong gains with tightly controlled downside moves."
-    if v >= 1.0:   return "bg", "Good", "Upward potential clearly outweighs downside volatility."
-    if v >= 0.5:   return "by", "Moderate", "Some downside exposure — manageable but worth watching."
-    if v >= 0.0:   return "by", "Limited", "Gains barely outpace downside volatility."
-    return "br", "High Risk", "Downside losses dominate — portfolio hit hard on bad days."
-
-def interpret_beta(v):
-    if pd.isna(v): return "bb", "Benchmark", "Beta is 1.0 by definition for SPY."
-    if v < 0:      return "bp", "Inverse", "Moves opposite the market — acts as a partial hedge."
-    if v < 0.5:    return "bg", "Very Defensive", "Low market sensitivity — largely independent of swings."
-    if v < 0.8:    return "bg", "Defensive", "Less volatile than the broader market."
-    if v <= 1.2:   return "by", "Market-Like", "Tracks the market closely. Typical for large-cap US stocks."
-    if v <= 1.5:   return "by", "Aggressive", "Amplifies market moves — bigger upside and steeper drops."
-    return "br", "Very Aggressive", "Highly sensitive to market swings. Expect magnified gains and losses."
-
-def interpret_drawdown(v):
-    if pd.isna(v): return "bb", "N/A", ""
-    if v > -0.05:  return "bg", "Minimal", "Less than 5% peak-to-trough — very resilient over this period."
-    if v > -0.15:  return "bg", "Low", "Max drop stayed below 15% — reasonable drawdown resilience."
-    if v > -0.25:  return "by", "Moderate", "Dropped up to 25% from peak. Worth monitoring in corrections."
-    if v > -0.40:  return "by", "Severe", "Significant losses from peak — high-volatility holding."
-    return "br", "Extreme", "Lost over 40% from its high — very high risk of deep losses."
-
-def interpret_var(v):
-    if pd.isna(v): return "bb", "N/A", ""
-    pct = abs(v) * 100
-    if pct < 1.5:  return "bg", "Low", "On a bad day (bottom 5%), expected daily loss is under 1.5%."
-    if pct < 2.5:  return "by", "Moderate", f"Worst days can see around {pct:.1f}% lost in a single session."
-    if pct < 3.5:  return "by", "Elevated", f"Tail risk is elevated — worst days up to {pct:.1f}% lost."
-    return "br", "High", f"Up to {pct:.1f}% can be lost on the worst days — significant daily tail risk."
-
-def interpret_cvar(v):
-    if pd.isna(v): return "bb", "N/A", ""
-    pct = abs(v) * 100
-    if pct < 2.0:  return "bg", "Low", f"Average loss across the worst 5% of days is only {pct:.1f}%."
-    if pct < 3.0:  return "by", "Moderate", f"Average worst-case daily loss is {pct:.1f}% — within range."
-    if pct < 4.5:  return "by", "Elevated", f"Average loss on worst days is {pct:.1f}%. Worth hedging."
-    return "br", "Severe", f"Average worst-case loss of {pct:.1f}% — heavy tail exposure."
-
-def interpret_div_score(v):
-    if pd.isna(v): return "bb", "N/A", ""
-    if v >= 70: return "bg", "Well Diversified", f"Score {v:.0f}/100 — holdings move independently, reducing overall risk."
-    if v >= 50: return "by", "Moderate", f"Score {v:.0f}/100 — some overlap in how holdings move. Consider adding uncorrelated assets."
-    if v >= 30: return "by", "Concentrated", f"Score {v:.0f}/100 — many holdings move together. A market drop likely hits all at once."
-    return "br", "Highly Concentrated", f"Score {v:.0f}/100 — holdings are tightly correlated. Little diversification benefit."
-
-INTERPRETERS = {
-    "Sharpe": interpret_sharpe, "Sortino": interpret_sortino,
-    "Beta": interpret_beta, "MaxDrawdown": interpret_drawdown,
-    "VaR": interpret_var, "CVaR": interpret_cvar,
-    "DivScore": interpret_div_score,
-}
-METRIC_DISPLAY = {
-    "Sharpe": "Sharpe Ratio", "Sortino": "Sortino Ratio", "Beta": "Beta",
-    "MaxDrawdown": "Max Drawdown", "VaR": "Value at Risk (5%)", "CVaR": "CVaR / Exp. Shortfall",
-    "DivScore": "Diversification Score",
-}
-PCT_DISPLAY = {"MaxDrawdown", "VaR", "CVaR"}
-INT_DISPLAY  = {"DivScore"}
-
-# Each entry: list of (badge_class, range_label, rating_label)
-METRIC_RANGES = {
-    "Sharpe": [
-        ("br", "< 0",    "Negative"),
-        ("by", "0–0.5",  "Weak"),
-        ("by", "0.5–1",  "Acceptable"),
-        ("bg", "> 1",    "Strong"),
-        ("bg", "> 2",    "Exceptional"),
-    ],
-    "Sortino": [
-        ("br", "< 0",    "Poor"),
-        ("by", "0–0.5",  "Limited"),
-        ("by", "0.5–1",  "Moderate"),
-        ("bg", "> 1",    "Good"),
-        ("bg", "> 2",    "Excellent"),
-    ],
-    "Beta": [
-        ("bp", "< 0",      "Inverse"),
-        ("bg", "0–0.5",    "Defensive"),
-        ("by", "0.8–1.2",  "Market-like"),
-        ("by", "1.2–1.5",  "Aggressive"),
-        ("br", "> 1.5",    "Very Aggressive"),
-    ],
-    "MaxDrawdown": [
-        ("bg", "> −5%",    "Minimal"),
-        ("bg", "−5–15%",   "Low"),
-        ("by", "−15–25%",  "Moderate"),
-        ("by", "−25–40%",  "Severe"),
-        ("br", "< −40%",   "Extreme"),
-    ],
-    "VaR": [
-        ("bg", "< 1.5%",   "Low"),
-        ("by", "1.5–2.5%", "Moderate"),
-        ("by", "2.5–3.5%", "Elevated"),
-        ("br", "> 3.5%",   "High"),
-    ],
-    "CVaR": [
-        ("bg", "< 2%",     "Low"),
-        ("by", "2–3%",     "Moderate"),
-        ("by", "3–4.5%",   "Elevated"),
-        ("br", "> 4.5%",   "Severe"),
-    ],
-    "DivScore": [
-        ("br", "0–30",   "Highly Concentrated"),
-        ("by", "30–50",  "Concentrated"),
-        ("by", "50–70",  "Moderate"),
-        ("bg", "70–100", "Well Diversified"),
-    ],
-}
-
-def _ranges_html(key):
-    tags = METRIC_RANGES.get(key, [])
-    if not tags:
-        return ""
-    items = "".join(
-        f'<span class="rtag rtag-{cls}"><b>{rng}</b>&nbsp;{lbl}</span>'
-        for cls, rng, lbl in tags
-    )
-    return f'<div class="mcard-ranges">{items}</div>'
-
-# ── Render a portfolio metric card ────────────────────────────────────────────
-def metric_card_html(key, value):
-    label = METRIC_DISPLAY.get(key, key)
-    cls, badge, desc = INTERPRETERS[key](value)
-    if pd.isna(value):
-        val_str = "—"
-    elif key in PCT_DISPLAY:
-        val_str = f"{value * 100:.2f}%"
-    elif key in INT_DISPLAY:
-        val_str = f"{value:.0f} / 100"
-    else:
-        val_str = f"{value:.3f}"
-    return (
-        f'<div class="mcard">'
-        f'  <div class="mcard-label">{label}</div>'
-        f'  <div class="mcard-val">{val_str}</div>'
-        f'  <span class="mcard-badge {cls}">{badge}</span>'
-        f'  <hr class="mcard-rule"/>'
-        f'  <div class="mcard-desc">{desc}</div>'
-        f'  {_ranges_html(key)}'
-        f'</div>'
-    )
-
-# ── Asset table styling ───────────────────────────────────────────────────────
-def _c(v, good_thresh, warn_thresh):
-    if pd.isna(v): return "color: #8b8cf8"
-    if v >= good_thresh: return "color: #10b981; font-weight: 600"
-    if v >= warn_thresh: return "color: #f59e0b"
-    return "color: #f43f5e"
-
-def col_beta(v):
-    if pd.isna(v): return "color: #8b8cf8"
-    if 0.8 <= v <= 1.2: return "color: #f59e0b"
-    if v < 0.8:         return "color: #10b981; font-weight: 600"
-    if v <= 1.5:        return "color: #f59e0b"
-    return "color: #f43f5e"
-
-def col_drawdown(v):
-    # v is negative; closer to 0 is better
-    if pd.isna(v): return "color: #8b8cf8"
-    if v > -0.10:  return "color: #10b981; font-weight: 600"
-    if v > -0.25:  return "color: #f59e0b"
-    return "color: #f43f5e"
-
-def col_var(v):
-    # v is negative; closer to 0 is better
-    if pd.isna(v): return "color: #8b8cf8"
-    if v > -0.015: return "color: #10b981; font-weight: 600"
-    if v > -0.025: return "color: #f59e0b"
-    return "color: #f43f5e"
-
-def corr_cell_css(v):
-    if pd.isna(v): return ""
-    if v >= 0.8:  return "background: rgba(244,63,94,0.18); color: #f43f5e; font-weight:600"
-    if v >= 0.6:  return "background: rgba(245,158,11,0.18); color: #f59e0b"
-    if v >= 0.4:  return "background: rgba(245,158,11,0.10)"
-    if v >= 0.2:  return "background: rgba(16,185,129,0.10)"
-    if v >= 0:    return "background: rgba(16,185,129,0.18); color: #10b981"
-    return "background: rgba(252,136,229,0.15); color: #fc88e5"
-
-COL_FNS = {
-    "Sharpe":      lambda v: _c(v, 1.0, 0.5),
-    "Sortino":     lambda v: _c(v, 1.0, 0.5),
-    "Beta":        col_beta,
-    "MaxDrawdown": col_drawdown,
-    "VaR":         col_var,
-    "CVaR":        col_var,
-}
-
-def style_asset_table(df):
-    s = df.style
-    for col, fn in COL_FNS.items():
-        if col in df.columns:
-            s = s.map(fn, subset=[col])
-    fmt = {c: ("{:.2%}" if c in PCT_METRICS else "{:.3f}") for c in df.columns}
-    return s.format(fmt, na_rep="—")
-
-# ── Chart builders ───────────────────────────────────────────────────────────
-def _plotly_layout(dark, height=380, ylabel="", xlabel=""):
-    bg         = "#0c0c0c" if dark else "#ffffff"
-    text_col   = "#f0f0f0" if dark else "#111111"
-    grid_col   = "#272727" if dark else "#e8e8e8"
-    return dict(
-        paper_bgcolor=bg, plot_bgcolor=bg,
-        font=dict(family="Inter", color=text_col, size=12),
-        height=height, margin=dict(l=0, r=10, t=40, b=0),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02,
-                    xanchor="left", x=0, bgcolor="rgba(0,0,0,0)",
-                    font=dict(size=11)),
-        xaxis=dict(title=xlabel, showgrid=True, gridcolor=grid_col,
-                   zeroline=False, color=text_col),
-        yaxis=dict(title=ylabel, showgrid=True, gridcolor=grid_col,
-                   zeroline=True, zerolinecolor=grid_col, color=text_col),
-        hovermode="x unified",
-    )
-
-_LINE_COLORS = [
-    "#fc88e5", "#10b981", "#f59e0b", "#8b8cf8", "#f43f5e",
-    "#06b6d4", "#a78bfa", "#fb923c", "#34d399", "#60a5fa",
-]
-
-def build_cumulative_chart(price_df, dark=False):
-    wide    = price_df.pivot(index="date", columns="ticker", values="close")
-    returns = wide.pct_change().dropna(how="all")
-    cumret  = (1 + returns).cumprod() - 1
-
-    non_spy = [t for t in returns.columns if t != "SPY"]
-    w       = np.ones(len(non_spy)) / len(non_spy)
-    port_r  = (returns[non_spy] * w).sum(axis=1)
-    cumport = (1 + port_r).cumprod() - 1
-
-    fig = go.Figure()
-
-    # Individual stocks
-    for i, ticker in enumerate(non_spy):
-        fig.add_trace(go.Scatter(
-            x=cumret.index, y=(cumret[ticker] * 100).round(2),
-            name=ticker,
-            line=dict(color=_LINE_COLORS[i % len(_LINE_COLORS)], width=1.5),
-            hovertemplate=f"<b>{ticker}</b>: %{{y:.1f}}%<extra></extra>",
-        ))
-
-    # SPY benchmark (dashed grey)
-    if "SPY" in cumret.columns:
-        spy_col = "#aaaaaa" if dark else "#999999"
-        fig.add_trace(go.Scatter(
-            x=cumret.index, y=(cumret["SPY"] * 100).round(2),
-            name="SPY (Benchmark)",
-            line=dict(color=spy_col, width=1.5, dash="dot"),
-            hovertemplate="<b>SPY</b>: %{y:.1f}%<extra></extra>",
-        ))
-
-    # Equal-weight portfolio (bold)
-    port_col = "#f0f0f0" if dark else "#111111"
-    fig.add_trace(go.Scatter(
-        x=cumport.index, y=(cumport * 100).round(2),
-        name="Portfolio (Equal Weight)",
-        line=dict(color=port_col, width=2.8),
-        hovertemplate="<b>Portfolio</b>: %{y:.1f}%<extra></extra>",
-    ))
-
-    layout = _plotly_layout(dark, height=400, ylabel="Cumulative Return (%)")
-    layout["hovermode"] = "x unified"
-    fig.update_layout(**layout)
-    return fig
-
-
-def build_frontier_chart(price_df, rfr=0.05, dark=False, n=2500):
-    wide    = price_df.pivot(index="date", columns="ticker", values="close")
-    returns = wide.pct_change().dropna(how="all")
-
-    opt = [t for t in returns.columns if t != "SPY"]
-    if len(opt) < 2:
-        return None
-
-    r        = returns[opt]
-    ann_mean = r.mean() * 252
-    ann_cov  = r.cov() * 252
-    k        = len(opt)
-
-    rng = np.random.default_rng(42)
-    p_vols, p_rets, p_sharpes = [], [], []
-    for _ in range(n):
-        w      = rng.dirichlet(np.ones(k))
-        p_ret  = float((ann_mean * w).sum())
-        p_vol  = float(np.sqrt(w @ ann_cov.values @ w))
-        p_sharpes.append((p_ret - rfr) / p_vol if p_vol > 0 else 0)
-        p_rets.append(p_ret * 100)
-        p_vols.append(p_vol * 100)
-
-    # Equal-weight stats
-    ew     = np.ones(k) / k
-    ew_ret = float((ann_mean * ew).sum()) * 100
-    ew_vol = float(np.sqrt(ew @ ann_cov.values @ ew)) * 100
-
-    # Per-stock stats
-    s_vols = (np.sqrt(np.diag(ann_cov.values)) * 100).tolist()
-    s_rets = (ann_mean.values * 100).tolist()
-
-    text_col = "#f0f0f0" if dark else "#111111"
-    port_col = "#f0f0f0" if dark else "#111111"
-
-    fig = go.Figure()
-
-    # Random portfolio cloud coloured by Sharpe
-    fig.add_trace(go.Scatter(
-        x=p_vols, y=p_rets, mode="markers",
-        marker=dict(
-            color=p_sharpes, colorscale="RdPu",
-            size=3, opacity=0.45,
-            colorbar=dict(title=dict(text="Sharpe", side="right"),
-                          thickness=12, len=0.55),
-        ),
-        name="Random Portfolios",
-        hovertemplate="Vol: %{x:.1f}%  Return: %{y:.1f}%<extra></extra>",
-    ))
-
-    # Individual stocks (pink dots)
-    fig.add_trace(go.Scatter(
-        x=s_vols, y=s_rets, mode="markers+text",
-        marker=dict(color="#fc88e5", size=10,
-                    line=dict(color=text_col, width=1)),
-        text=opt, textposition="top center",
-        textfont=dict(size=10, color=text_col),
-        name="Individual Stocks",
-        hovertemplate="<b>%{text}</b><br>Vol: %{x:.1f}%  Return: %{y:.1f}%<extra></extra>",
-    ))
-
-    # SPY benchmark (grey diamond)
-    if "SPY" in returns.columns:
-        spy_vol = float(returns["SPY"].std() * np.sqrt(252) * 100)
-        spy_ret = float(returns["SPY"].mean() * 252 * 100)
-        fig.add_trace(go.Scatter(
-            x=[spy_vol], y=[spy_ret], mode="markers+text",
-            marker=dict(color="#888888", size=12, symbol="diamond",
-                        line=dict(color="#888888", width=1)),
-            text=["SPY"], textposition="top center",
-            textfont=dict(size=10, color="#888888"),
-            name="SPY Benchmark",
-            hovertemplate="<b>SPY</b><br>Vol: %{x:.1f}%  Return: %{y:.1f}%<extra></extra>",
-        ))
-
-    # Your portfolio (star)
-    fig.add_trace(go.Scatter(
-        x=[ew_vol], y=[ew_ret], mode="markers+text",
-        marker=dict(color=port_col, size=16, symbol="star",
-                    line=dict(color="#fc88e5", width=2)),
-        text=["Your Portfolio"], textposition="top center",
-        textfont=dict(size=11, color=text_col, family="Inter"),
-        name="Your Portfolio",
-        hovertemplate="<b>Your Portfolio</b><br>Vol: %{x:.1f}%  Return: %{y:.1f}%<extra></extra>",
-    ))
-
-    layout = _plotly_layout(dark, height=460,
-                            xlabel="Annualized Volatility (%)",
-                            ylabel="Annualized Return (%)")
-    layout.pop("hovermode")
-    layout["hovermode"] = "closest"
-    fig.update_layout(**layout)
-    return fig
-
-
-_SECTOR_COLORS = [
-    "#fc88e5", "#10b981", "#f59e0b", "#8b8cf8", "#f43f5e",
-    "#06b6d4", "#a78bfa", "#fb923c", "#34d399", "#60a5fa", "#e879f9",
-]
-
-def build_sector_chart(price_df, weights_map, dark=False):
-    sector_map = (
-        price_df.drop_duplicates("ticker")
-        .set_index("ticker")["sector"]
-        .to_dict()
-    )
-    bucket = {}
-    for ticker, w in weights_map.items():
-        s = sector_map.get(ticker) or "Other"
-        if pd.isna(s):
-            s = "Other"
-        bucket[s] = bucket.get(s, 0) + w
-
-    labels = list(bucket.keys())
-    values = [bucket[l] * 100 for l in labels]
-    text_col = "#f0f0f0" if dark else "#111111"
-    bg       = "#0c0c0c" if dark else "#ffffff"
-
-    fig = go.Figure(go.Pie(
-        labels=labels, values=values, hole=0.5,
-        textinfo="label+percent",
-        textfont=dict(family="Inter", size=11, color=text_col),
-        marker=dict(colors=_SECTOR_COLORS[:len(labels)]),
-        hovertemplate="<b>%{label}</b><br>%{value:.1f}%<extra></extra>",
-    ))
-    fig.update_layout(
-        paper_bgcolor=bg,
-        font=dict(family="Inter", color=text_col),
-        height=320, margin=dict(l=0, r=0, t=10, b=0),
-        legend=dict(
-            orientation="v", yanchor="middle", y=0.5,
-            xanchor="left", x=1.02,
-            font=dict(size=11, color=text_col),
-            bgcolor="rgba(0,0,0,0)",
-        ),
-    )
-    return fig
-
-
-def build_monte_carlo(port_r_series, portfolio_value, target_value, years, dark=False, n_sim=1000):
-    mu    = float(port_r_series.mean())
-    sigma = float(port_r_series.std())
-    n_days = max(int(years * 252), 1)
-
-    rng   = np.random.default_rng(0)
-    daily = rng.normal(mu, sigma, size=(n_sim, n_days))
-    cum   = np.cumprod(1 + daily, axis=1) * portfolio_value
-
-    x    = np.linspace(years / n_days, years, n_days)
-    p10  = np.percentile(cum, 10,  axis=0)
-    p25  = np.percentile(cum, 25,  axis=0)
-    p50  = np.percentile(cum, 50,  axis=0)
-    p75  = np.percentile(cum, 75,  axis=0)
-    p90  = np.percentile(cum, 90,  axis=0)
-
-    final       = cum[:, -1]
-    prob        = float((final >= target_value).mean())
-    median_out  = float(np.median(final))
-    p10_out     = float(np.percentile(final, 10))
-    p90_out     = float(np.percentile(final, 90))
-
-    bg       = "#0c0c0c" if dark else "#ffffff"
-    text_col = "#f0f0f0" if dark else "#111111"
-    grid_col = "#272727" if dark else "#e8e8e8"
-
-    fig = go.Figure()
-    fig.add_trace(go.Scatter(
-        x=np.concatenate([x, x[::-1]]),
-        y=np.concatenate([p90, p10[::-1]]),
-        fill="toself", fillcolor="rgba(139,140,248,0.10)",
-        line=dict(color="rgba(0,0,0,0)"),
-        name="10th–90th %ile", hoverinfo="skip",
-    ))
-    fig.add_trace(go.Scatter(
-        x=np.concatenate([x, x[::-1]]),
-        y=np.concatenate([p75, p25[::-1]]),
-        fill="toself", fillcolor="rgba(139,140,248,0.22)",
-        line=dict(color="rgba(0,0,0,0)"),
-        name="25th–75th %ile", hoverinfo="skip",
-    ))
-    fig.add_trace(go.Scatter(
-        x=x, y=p50,
-        name="Median outcome",
-        line=dict(color="#8b8cf8", width=2.5),
-        hovertemplate="Year %{x:.1f}: $%{y:,.0f}<extra></extra>",
-    ))
-    fig.add_hline(
-        y=target_value,
-        line=dict(color="#fc88e5", width=1.5, dash="dot"),
-        annotation_text=f"  Target ${target_value:,.0f}",
-        annotation_font=dict(color="#fc88e5", size=11),
-        annotation_position="right",
-    )
-    fig.add_hline(
-        y=portfolio_value,
-        line=dict(color=grid_col, width=1, dash="dot"),
-        annotation_text=f"  Start ${portfolio_value:,.0f}",
-        annotation_font=dict(color=text_col, size=10),
-        annotation_position="right",
-    )
-    fig.update_layout(
-        paper_bgcolor=bg, plot_bgcolor=bg,
-        font=dict(family="Inter", color=text_col, size=12),
-        height=400, margin=dict(l=0, r=120, t=20, b=0),
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0,
-                    bgcolor="rgba(0,0,0,0)", font=dict(size=11)),
-        xaxis=dict(title="Years", showgrid=True, gridcolor=grid_col, color=text_col),
-        yaxis=dict(title="Portfolio Value", showgrid=True, gridcolor=grid_col,
-                   color=text_col, tickprefix="$", tickformat=",.0f"),
-        hovermode="x unified",
-    )
-    return fig, prob, median_out, p10_out, p90_out
-
-
-# ── Load universe data ────────────────────────────────────────────────────────
 const_df, etfs_df, all_sectors = load_universe()
+
+EQUAL_MODE = "Equal weight"
+CUSTOM_MODE = "Custom amounts ($)"
+_HORIZON_LABELS = {"1": "1 Year", "3": "3 Years", "5": "5 Years", "10": "10 Years"}
+_HORIZON_NUMS = {v: k for k, v in _HORIZON_LABELS.items()}
+
+
+def extract_symbol(label):
+    return label.split("  —  ")[0].strip()
+
+
+# ── URL prefill (shareable portfolios) ────────────────────────────────────────
+# ?t=AAPL,MSFT&h=5&r=5&a=1000,2000 (custom $) or &v=25000 (portfolio value)
+_qp = st.query_params
+if "t" in _qp and not st.session_state.get("qp_loaded"):
+    st.session_state.qp_loaded = True
+    _syms = [s.strip().upper() for s in _qp["t"].split(",") if s.strip()]
+    _sp500 = set(const_df["Symbol"])
+    st.session_state["stock_sel"] = const_df[const_df["Symbol"].isin(_syms)]["label"].tolist()
+    if not etfs_df.empty:
+        _etf_syms = [s for s in _syms if s not in _sp500]
+        st.session_state["etf_sel"] = etfs_df[etfs_df["symbol"].isin(_etf_syms)]["label"].tolist()
+    st.session_state["horizon"] = _HORIZON_LABELS.get(_qp.get("h", "5"), "5 Years")
+    try:
+        _r = float(_qp.get("r", 5.0))
+        st.session_state["rfr_pct"] = min(max(round(_r * 2) / 2, 0.0), 10.0)
+    except ValueError:
+        pass
+    if "a" in _qp:
+        _amts = _qp["a"].split(",")
+        st.session_state["wmode"] = CUSTOM_MODE
+        try:
+            st.session_state["amounts"] = {
+                s: float(a) for s, a in zip(_syms, _amts) if a
+            }
+        except ValueError:
+            pass
+    elif "v" in _qp:
+        try:
+            st.session_state["pv"] = int(float(_qp["v"]))
+        except ValueError:
+            pass
+    st.session_state.analysis_run = True
+
+
+# ── Example portfolio (onboarding) ────────────────────────────────────────────
+def _load_example():
+    ex_stocks = ["AAPL", "MSFT", "JNJ", "XOM", "PG"]
+    st.session_state["stock_sel"] = const_df[const_df["Symbol"].isin(ex_stocks)]["label"].tolist()
+    if not etfs_df.empty:
+        st.session_state["etf_sel"] = etfs_df[etfs_df["symbol"].isin(["QQQ", "GLD"])]["label"].tolist()
+    st.session_state["wmode"] = EQUAL_MODE
+    st.session_state.analysis_run = True
+
 
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
 
-    # Dark mode toggle — top right
-    toggle_col, _ = st.columns([1, 0.01])
-    with toggle_col:
-        new_dark = st.toggle(
-            "Dark mode",
-            value=st.session_state.dark_mode,
-            key="dark_toggle",
-        )
+    new_dark = st.toggle("Dark mode", value=st.session_state.dark_mode, key="dark_toggle")
     if new_dark != st.session_state.dark_mode:
         st.session_state.dark_mode = new_dark
         st.rerun()
 
     st.markdown("---")
 
-    # ── Time horizon ──
     st.markdown('<span class="sb-label">Time Horizon</span>', unsafe_allow_html=True)
     time_horizon = st.radio(
         "Time Horizon",
         ["1 Year", "3 Years", "5 Years", "10 Years"],
         index=2,
+        key="horizon",
         label_visibility="collapsed",
     )
 
     st.markdown("---")
 
-    # ── Sector filter ──
     st.markdown('<span class="sb-label">Filter by Sector</span>', unsafe_allow_html=True)
     selected_sectors = st.multiselect(
         "Filter by Sector",
@@ -918,7 +145,6 @@ with st.sidebar:
         label_visibility="collapsed",
     )
 
-    # ── Stock picker ──
     st.markdown('<span class="sb-label">Stocks</span>', unsafe_allow_html=True)
     st.caption("Search by ticker or company name.")
     if selected_sectors:
@@ -930,50 +156,94 @@ with st.sidebar:
     selected_stock_labels = st.multiselect(
         "Stocks",
         options=stock_options,
-        default=[],
         placeholder="Type to search…",
         max_selections=25,
+        key="stock_sel",
         label_visibility="collapsed",
     )
 
-    # ── ETF picker ──
     st.markdown('<span class="sb-label">ETFs &amp; Indices</span>', unsafe_allow_html=True)
-    st.caption("SPY is always included as benchmark.")
+    st.caption("SPY is always the benchmark — add it here to also hold it.")
     etf_options = etfs_df["label"].tolist() if not etfs_df.empty else []
     selected_etf_labels = st.multiselect(
         "ETFs",
         options=etf_options,
-        default=[],
-        placeholder="e.g. QQQ, GLD…",
+        placeholder="e.g. SPY, QQQ, GLD…",
+        key="etf_sel",
         label_visibility="collapsed",
     )
 
+    # Symbols the user actually picked (their holdings)
+    user_picks = [extract_symbol(l) for l in selected_stock_labels]
+    user_picks += [extract_symbol(l) for l in selected_etf_labels]
+    user_picks = list(dict.fromkeys(user_picks))[:29]
+
     st.markdown("---")
 
-    # ── Risk-free rate ──
+    # ── Weighting ──
+    st.markdown('<span class="sb-label">Weighting</span>', unsafe_allow_html=True)
+    weight_mode = st.radio(
+        "Weighting",
+        [EQUAL_MODE, CUSTOM_MODE],
+        key="wmode",
+        label_visibility="collapsed",
+    )
+
+    amounts = {}
+    if weight_mode == CUSTOM_MODE and user_picks:
+        _saved = st.session_state.get("amounts", {})
+        _rows = pd.DataFrame(
+            {"Ticker": user_picks,
+             "Amount ($)": [float(_saved.get(t, 1000.0)) for t in user_picks]}
+        )
+        _edited = st.data_editor(
+            _rows,
+            hide_index=True,
+            disabled=["Ticker"],
+            column_config={
+                "Amount ($)": st.column_config.NumberColumn(
+                    "Amount ($)", min_value=0.0, step=100.0, format="$%d"
+                ),
+            },
+            key=f"amt_editor_{'_'.join(user_picks)}",
+            width="stretch",
+        )
+        amounts = {
+            str(r["Ticker"]): float(r["Amount ($)"] or 0.0)
+            for _, r in _edited.iterrows()
+        }
+        st.session_state["amounts"] = {**_saved, **amounts}
+        st.caption(f"Total: ${sum(amounts.values()):,.0f} — metrics use these dollar weights.")
+    elif weight_mode == CUSTOM_MODE:
+        st.caption("Pick stocks or ETFs above to enter dollar amounts.")
+
+    st.markdown("---")
+
     st.markdown('<span class="sb-label">Risk-Free Rate</span>', unsafe_allow_html=True)
     rfr_pct = st.slider(
         "Risk-Free Rate",
         min_value=0.0, max_value=10.0, value=5.0,
         step=0.5, format="%.1f%%",
+        key="rfr_pct",
         label_visibility="collapsed",
     )
     rfr = rfr_pct / 100
     st.caption(f"Currently {rfr_pct:.1f}% — this is the 'safe' return (e.g. T-bill) used to measure whether your portfolio rewards you enough for the extra risk taken.")
 
-    st.markdown("---")
-
-    # ── Portfolio value ──
-    st.markdown('<span class="sb-label">Portfolio Value (Optional)</span>', unsafe_allow_html=True)
-    portfolio_value = st.number_input(
-        "Portfolio Value",
-        min_value=0, max_value=100_000_000, value=0, step=1000,
-        format="%d", label_visibility="collapsed",
-    )
-    st.caption("Enter your total investment to translate risk percentages into dollar amounts.")
+    portfolio_value = 0
+    if weight_mode == EQUAL_MODE:
+        st.markdown("---")
+        st.markdown('<span class="sb-label">Portfolio Value (Optional)</span>', unsafe_allow_html=True)
+        portfolio_value = st.number_input(
+            "Portfolio Value",
+            min_value=0, max_value=100_000_000, value=0, step=1000,
+            format="%d", key="pv", label_visibility="collapsed",
+        )
+        st.caption("Enter your total investment to translate risk percentages into dollar amounts.")
 
     st.markdown("---")
     run_btn = st.button("Run Analysis", width="stretch", type="primary")
+    st.caption("After running, your setup is saved in the page URL — copy it from the address bar to share or bookmark.")
 
 # ── Dates ─────────────────────────────────────────────────────────────────────
 _days   = {"1 Year": 365,  "3 Years": 1095, "5 Years": 1825, "10 Years": 3650}
@@ -987,33 +257,49 @@ st.markdown(
     unsafe_allow_html=True,
 )
 st.markdown(
-    '<p class="hero-sub">Select stocks and ETFs in the sidebar — search by company name or ticker. '
-    "SPY is always included as the S&amp;P 500 benchmark. Click Run Analysis when ready.</p>",
+    '<p class="hero-sub">Understand what your portfolio actually does: how much risk you\'re taking, '
+    "where it comes from, and what the same holdings could look like with different weights. "
+    "Every metric is explained in plain English — see the Glossary page for definitions.</p>",
     unsafe_allow_html=True,
 )
 
 if run_btn:
     st.session_state.analysis_run = True
 
+# ── Onboarding empty state ────────────────────────────────────────────────────
 if not st.session_state.get("analysis_run", False):
-    st.info("Build your portfolio in the sidebar and click **Run Analysis** to begin.", icon="ℹ️")
+    _steps = st.columns(3)
+    _step_content = [
+        ("1", "Pick your holdings",
+         "Choose up to 25 stocks and ETFs in the sidebar — search by ticker or company name. SPY is always included as the market benchmark."),
+        ("2", "Set your amounts",
+         "Use equal weighting to explore, or switch to Custom amounts and enter the dollars you actually hold in each position."),
+        ("3", "Run the analysis",
+         "Get risk metrics with plain-English interpretations, automatic insights, and suggested weightings from the same holdings."),
+    ]
+    for col, (num, title, desc) in zip(_steps, _step_content):
+        with col:
+            st.markdown(
+                f'<div class="step-card"><div class="step-num">{num}</div>'
+                f'<div class="step-title">{title}</div>'
+                f'<div class="step-desc">{desc}</div></div>',
+                unsafe_allow_html=True,
+            )
+    st.markdown("<br>", unsafe_allow_html=True)
+    _c1, _c2 = st.columns([1, 2.2])
+    with _c1:
+        st.button("Try an example portfolio →", type="primary", on_click=_load_example,
+                  width="stretch")
+    with _c2:
+        st.caption("Loads a 7-asset mix (tech, healthcare, energy, consumer staples, QQQ, gold) so you can explore every feature immediately.")
     st.stop()
 
 # ── Parse selections ──────────────────────────────────────────────────────────
-def extract_symbol(label):
-    return label.split("  —  ")[0].strip()
-
-chosen = [extract_symbol(l) for l in selected_stock_labels]
-chosen += [extract_symbol(l) for l in selected_etf_labels]
-chosen = list(dict.fromkeys(chosen))  # dedupe, preserve order
-
-if not chosen:
+if not user_picks:
     st.warning("Select at least one stock or ETF from the sidebar before running analysis.", icon="⚠️")
     st.stop()
 
-if "SPY" not in chosen:
-    chosen.insert(0, "SPY")
-tickers_list = chosen[:29]  # 29 user picks + SPY = 30 (helpers.py cap)
+tickers_list = list(dict.fromkeys(["SPY"] + user_picks))[:30]
 
 # ── Fetch + compute ───────────────────────────────────────────────────────────
 with st.spinner("Fetching data and computing metrics…"):
@@ -1023,28 +309,71 @@ with st.spinner("Fetching data and computing metrics…"):
         st.error(f"Failed to load price data: {e}")
         st.stop()
 
-    actual = df["ticker"].unique().tolist()
+    actual  = df["ticker"].unique().tolist()
     missing = [t for t in tickers_list if t not in actual]
-    weights = [1 / len(actual)] * len(actual)
+    held    = [t for t in user_picks if t in actual]
 
-    asset_df  = core.compute_asset_metrics(df, benchmark_ticker="SPY", risk_free_rate=rfr)
+    if not held:
+        st.error("None of the selected tickers have data for this period.")
+        st.stop()
+
+    # ── Weights: the user's actual portfolio ──
+    if weight_mode == CUSTOM_MODE and sum(amounts.get(t, 0) for t in held) > 0:
+        _total = sum(amounts.get(t, 0.0) for t in held)
+        weights_map = {t: amounts.get(t, 0.0) / _total for t in held}
+        portfolio_value = int(round(_total))
+        weighting_desc = "Custom ($ amounts)"
+    else:
+        weights_map = {t: 1.0 / len(held) for t in held}
+        weighting_desc = f"Equal ({100 / len(held):.0f}% each)"
+    full_weights = {**{t: 0.0 for t in actual}, **weights_map}
+
+    asset_df = core.compute_asset_metrics(df, benchmark_ticker="SPY", risk_free_rate=rfr)
     port_dict, corr = core.compute_portfolio_metrics(
-        df, weights, benchmark_ticker="SPY", risk_free_rate=rfr
+        df, full_weights, benchmark_ticker="SPY", risk_free_rate=rfr
+    )
+    div_score = core.diversification_score(corr, weights_map)
+
+    returns_wide  = df.pivot(index="date", columns="ticker", values="close").ffill().pct_change(fill_method=None).dropna(how="all")
+    port_r_series = core.portfolio_return_series(returns_wide, full_weights)
+    bench_r       = returns_wide["SPY"]
+
+    sector_map = df.drop_duplicates("ticker").set_index("ticker")["sector"].to_dict()
+
+    # ── Optimizer + insights ──
+    opt = None
+    if len(held) >= 2:
+        opt = optimize.optimize_portfolios(returns_wide[held], rfr=rfr)
+    cur_stats = optimize.portfolio_stats(returns_wide[held], weights_map, rfr=rfr)
+
+    insight_items = insights.generate_insights(
+        corr=corr,
+        weights_map=weights_map,
+        sector_map=sector_map,
+        returns_wide=returns_wide,
+        port_r=port_r_series,
+        bench_r=bench_r,
+        port_metrics=port_dict,
+        div_score=div_score,
+        opt=opt,
     )
 
-    # Diversification score from correlation matrix
-    _corr_vals = corr.values
-    _mask = ~np.eye(len(_corr_vals), dtype=bool)
-    _avg_corr = float(_corr_vals[_mask].mean()) if _mask.any() else 0.0
-    div_score = round(float(np.clip(50 * (1 - _avg_corr), 0, 100)))
-
-    # Portfolio daily return series (for dollar drawdown + Monte Carlo)
-    _ret_wide  = df.pivot(index="date", columns="ticker", values="close").pct_change().dropna(how="all")
-    port_r_series = core.portfolio_return_series(_ret_wide, np.array(weights))
+# ── Persist setup in the URL (share / bookmark) ───────────────────────────────
+_qp_out = {"t": ",".join(held), "h": _HORIZON_NUMS[time_horizon], "r": f"{rfr_pct:g}"}
+if weight_mode == CUSTOM_MODE and amounts:
+    _qp_out["a"] = ",".join(str(int(amounts.get(t, 0))) for t in held)
+elif portfolio_value:
+    _qp_out["v"] = str(int(portfolio_value))
+try:
+    st.query_params.from_dict(_qp_out)
+except Exception:
+    pass
 
 # ── Info bar ──────────────────────────────────────────────────────────────────
 chips = " ".join(
-    f'<span class="chip {"chip-bench" if t == "SPY" else ""}">{t}</span>'
+    f'<span class="chip {"chip-bench" if t == "SPY" and t not in held else ""}">{t}'
+    + (f' {weights_map[t]*100:.0f}%' if t in held and len(held) > 1 else "")
+    + "</span>"
     for t in actual
 )
 st.markdown(
@@ -1053,7 +382,7 @@ st.markdown(
     f"<b>Period</b> &nbsp; {start_date} → {end_date} &nbsp;&nbsp;"
     f"<b>Horizon</b> &nbsp; {time_horizon} &nbsp;&nbsp;"
     f"<b>Risk-free rate</b> &nbsp; {rfr * 100:.1f}% &nbsp;&nbsp;"
-    f"<b>Weighting</b> &nbsp; Equal ({100 / len(actual):.0f}% each)"
+    f"<b>Weighting</b> &nbsp; {weighting_desc}"
     f"</div>",
     unsafe_allow_html=True,
 )
@@ -1063,202 +392,298 @@ if missing:
         icon="⚠️",
     )
 
-# ── Asset Metrics ─────────────────────────────────────────────────────────────
-st.markdown('<div class="section-title">Breakdown</div>', unsafe_allow_html=True)
-st.markdown('<div class="section-heading">Asset Metrics</div>', unsafe_allow_html=True)
-st.markdown(
-    '<div class="section-desc">'
-    "Per-stock risk and return over the selected period. "
-    "SPY is the benchmark — Beta, Sharpe, and Sortino are all measured relative to it. "
-    "Green = favorable &nbsp;·&nbsp; Amber = neutral &nbsp;·&nbsp; Rose = elevated risk."
-    "</div>",
-    unsafe_allow_html=True,
-)
-st.dataframe(style_asset_table(asset_df), width="stretch")
+# ── Shared stats for scorecard ────────────────────────────────────────────────
+_port_total = float((1 + port_r_series.dropna()).prod() - 1)
+_spy_total  = float((1 + bench_r.dropna()).prod() - 1)
+_port_vol   = float(port_r_series.std() * np.sqrt(252))
+_spy_vol    = float(bench_r.std() * np.sqrt(252))
+_max_dd     = port_dict.get("MaxDrawdown", np.nan)
 
-# ── Portfolio Metrics ─────────────────────────────────────────────────────────
-st.markdown('<div class="section-title">Combined View</div>', unsafe_allow_html=True)
-st.markdown('<div class="section-heading">Portfolio Metrics</div>', unsafe_allow_html=True)
-st.markdown(
-    '<div class="section-desc">'
-    "Your holdings treated as a single equally-weighted position. "
-    "These figures describe how the portfolio behaves as a whole."
-    "</div>",
-    unsafe_allow_html=True,
-)
-_metric_keys = ["Sharpe", "Sortino", "Beta", "MaxDrawdown", "VaR", "CVaR", "DivScore"]
-_metric_vals  = {**port_dict, "DivScore": div_score}
-cols = st.columns(3)
-for i, key in enumerate(_metric_keys):
-    with cols[i % 3]:
-        st.markdown(metric_card_html(key, _metric_vals.get(key, np.nan)), unsafe_allow_html=True)
 
-# ── Dollar drawdown translation (C) ──────────────────────────────────────────
-if portfolio_value and portfolio_value > 0:
-    _max_dd  = port_dict.get("MaxDrawdown", 0) or 0
-    _ann_ret = float(port_r_series.mean() * 252)
-    _dollar_loss = abs(_max_dd * portfolio_value)
-    if _ann_ret > 0 and _max_dd < 0:
-        _recovery_needed = 1 / (1 + _max_dd) - 1
-        _recovery_months = (np.log(1 + _recovery_needed) / np.log(1 + _ann_ret)) * 12
-        _recovery_txt = f"At the portfolio's historical average annual return of <b>{_ann_ret*100:.1f}%</b>, estimated recovery is <b>~{_recovery_months:.0f} months</b>."
-    else:
-        _recovery_txt = "Recovery time cannot be estimated — the portfolio's historical average annual return is negative or zero."
-    st.markdown(
-        f'<div class="info-bar">'
-        f"<b>Dollar Context</b> &nbsp; Based on a <b>${portfolio_value:,.0f}</b> portfolio &nbsp;&mdash;&nbsp; "
-        f"the max drawdown of <b>{_max_dd*100:.1f}%</b> represents a peak loss of <b>${_dollar_loss:,.0f}</b>. &nbsp;"
-        f"{_recovery_txt}"
-        f"</div>",
-        unsafe_allow_html=True,
+def _scard(label, value, sub="", cls=""):
+    return (
+        f'<div class="scard"><div class="scard-label">{label}</div>'
+        f'<div class="scard-val {cls}">{value}</div>'
+        f'<div class="scard-sub">{sub}</div></div>'
     )
 
-# ── Charts ───────────────────────────────────────────────────────────────────
-st.markdown('<div class="section-title">Performance</div>', unsafe_allow_html=True)
-st.markdown('<div class="section-heading">Cumulative Returns</div>', unsafe_allow_html=True)
-st.markdown(
-    '<div class="section-desc">'
-    "Growth of $1 invested at the start of the period. The bold line is your equal-weight portfolio, "
-    "the dotted line is SPY. Hover over any point to compare values."
-    "</div>",
-    unsafe_allow_html=True,
-)
-st.plotly_chart(build_cumulative_chart(df, dark=dark), use_container_width=True)
 
-st.markdown('<div class="section-title">Risk vs. Return</div>', unsafe_allow_html=True)
-st.markdown('<div class="section-heading">Efficient Frontier</div>', unsafe_allow_html=True)
-st.markdown(
-    '<div class="section-desc">'
-    "Each dot in the cloud is one of 2,500 randomly weighted combinations of your stocks, coloured by Sharpe ratio (pink = higher). "
-    "Pink dots are your individual stocks. The star is your equal-weight portfolio. "
-    "Portfolios toward the <b>upper-left</b> are best — higher return for less risk."
-    "</div>",
-    unsafe_allow_html=True,
-)
-frontier_fig = build_frontier_chart(df, rfr=rfr, dark=dark)
-if frontier_fig:
-    st.plotly_chart(frontier_fig, use_container_width=True)
-else:
-    st.info("Select at least 2 stocks (excluding SPY) to see the efficient frontier.", icon="ℹ️")
+def _section(title, heading, desc):
+    st.markdown(f'<div class="section-title">{title}</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="section-heading">{heading}</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="section-desc">{desc}</div>', unsafe_allow_html=True)
 
-# ── Correlation Matrix ────────────────────────────────────────────────────────
-st.markdown('<div class="section-title">Diversification</div>', unsafe_allow_html=True)
-st.markdown('<div class="section-heading">Correlation Matrix</div>', unsafe_allow_html=True)
-st.markdown(
-    '<div class="section-desc">'
-    "How closely each stock moves with the others. "
-    "<b style='color:#10b981'>Near 0 or negative</b> = independent or inverse moves (good diversification). "
-    "<b style='color:#f43f5e'>Near 1.0</b> = move together (lower diversification)."
-    "</div>",
-    unsafe_allow_html=True,
-)
-st.dataframe(
-    corr.style.map(corr_cell_css).format("{:.2f}"),
-    width="stretch",
+
+# ── Tabs ──────────────────────────────────────────────────────────────────────
+tab_overview, tab_perf, tab_risk, tab_div, tab_whatif, tab_plan = st.tabs(
+    ["Overview", "Performance", "Risk", "Diversification", "What-If & Optimize", "Planning"]
 )
 
-# ── Weight Adjustment (D) + Sector Chart (A) ─────────────────────────────────
-st.markdown('<div class="section-title">What-If</div>', unsafe_allow_html=True)
-st.markdown('<div class="section-heading">Adjust Portfolio Weights</div>', unsafe_allow_html=True)
-st.markdown(
-    '<div class="section-desc">'
-    "Drag the sliders to try different allocations. Metrics and sector breakdown update instantly. "
-    "Weights are normalised automatically — the total always equals 100%."
-    "</div>",
-    unsafe_allow_html=True,
-)
+# ═══ OVERVIEW ═════════════════════════════════════════════════════════════════
+with tab_overview:
+    _section("At a Glance", "Portfolio vs. Market",
+             "How your portfolio performed against simply holding SPY over the same period.")
 
-_non_spy = sorted([t for t in actual if t != "SPY"])
-_w_cols  = st.columns(min(len(_non_spy), 4))
-_raw_w   = {}
-for i, ticker in enumerate(_non_spy):
-    _default = round(100.0 / len(_non_spy), 1)
-    _raw_w[ticker] = _w_cols[i % len(_w_cols)].slider(
-        ticker, 0.0, 100.0, _default, 1.0, key=f"cw_{ticker}"
-    )
+    _sc = st.columns(4)
+    _ret_cls = "pos" if _port_total >= _spy_total else "neg"
+    _vol_cls = "pos" if _port_vol <= _spy_vol else "neg"
+    _sharpe_v = port_dict.get("Sharpe", np.nan)
+    _, _sharpe_word, _ = interpret.interpret_sharpe(_sharpe_v)
+    _dd_sub = (f"−${abs(_max_dd) * portfolio_value:,.0f} on ${portfolio_value:,.0f}"
+               if portfolio_value else "worst peak-to-trough drop")
+    _cards = [
+        ("Total Return", f"{_port_total*100:+.1f}%", f"SPY: {_spy_total*100:+.1f}%", _ret_cls),
+        ("Volatility (Ann.)", f"{_port_vol*100:.1f}%", f"SPY: {_spy_vol*100:.1f}%", _vol_cls),
+        ("Sharpe Ratio", f"{_sharpe_v:.2f}" if not pd.isna(_sharpe_v) else "—", _sharpe_word, ""),
+        ("Max Drawdown", f"{_max_dd*100:.1f}%" if not pd.isna(_max_dd) else "—", _dd_sub, ""),
+    ]
+    for col, (lbl, val, sub, cls) in zip(_sc, _cards):
+        with col:
+            st.markdown(_scard(lbl, val, sub, cls), unsafe_allow_html=True)
 
-_total_w = sum(_raw_w.values())
-if _total_w > 0:
-    _sorted_actual = sorted(actual)
-    _custom_w_arr  = np.array([
-        0.0 if t == "SPY" else _raw_w.get(t, 0) / _total_w
-        for t in _sorted_actual
-    ])
-    _custom_port_dict, _ = core.compute_portfolio_metrics(
-        df, _custom_w_arr, benchmark_ticker="SPY", risk_free_rate=rfr
-    )
-    _custom_div_vals = {**_custom_port_dict, "DivScore": div_score}
+    if insight_items:
+        _section("Insights", "What Stands Out",
+                 "Automatic findings from your portfolio's data — concentration, correlation, history, and improvement opportunities.")
+        for item in insight_items:
+            st.markdown(insights.insight_html(item), unsafe_allow_html=True)
 
-    _custom_weights_map = {
-        t: (0.0 if t == "SPY" else _raw_w.get(t, 0) / _total_w)
-        for t in actual
-    }
-    _effective = {t: w for t, w in _custom_weights_map.items() if t != "SPY"}
-
-    eff_chips = " ".join(
-        f'<span class="chip">{t} {v*100:.1f}%</span>'
-        for t, v in sorted(_effective.items(), key=lambda x: -x[1])
-    )
-    st.markdown(
-        f'<div class="info-bar"><b>Effective weights</b> &nbsp; {eff_chips}</div>',
-        unsafe_allow_html=True,
-    )
-
-    _adj_cols = st.columns(3)
+    _section("Combined View", "Portfolio Metrics",
+             "Your holdings treated as a single weighted position. These figures describe how the portfolio behaves as a whole.")
+    _metric_keys = ["Sharpe", "Sortino", "Beta", "MaxDrawdown", "VaR", "CVaR", "DivScore"]
+    _metric_vals = {**port_dict, "DivScore": div_score}
+    cols = st.columns(3)
     for i, key in enumerate(_metric_keys):
-        with _adj_cols[i % 3]:
-            st.markdown(
-                metric_card_html(key, _custom_div_vals.get(key, np.nan)),
-                unsafe_allow_html=True,
-            )
+        with cols[i % 3]:
+            st.markdown(metric_card_html(key, _metric_vals.get(key, np.nan)), unsafe_allow_html=True)
 
-    # Single sector chart — always reflects current slider weights
-    st.plotly_chart(
-        build_sector_chart(df, _custom_weights_map, dark=dark),
-        use_container_width=True,
-    )
-
-# ── Monte Carlo Simulation (F) ────────────────────────────────────────────────
-st.markdown('<div class="section-title">Planning</div>', unsafe_allow_html=True)
-st.markdown('<div class="section-heading">Monte Carlo Simulation</div>', unsafe_allow_html=True)
-st.markdown(
-    '<div class="section-desc">'
-    "Simulates 1,000 possible futures for your portfolio based on its historical daily return and volatility. "
-    "Useful for understanding the range of outcomes — not a prediction. "
-    "<b>Assumes normally distributed returns</b> based on past data, which underestimates extreme events."
-    "</div>",
-    unsafe_allow_html=True,
-)
-
-if not (portfolio_value and portfolio_value > 0):
-    st.info("Enter your portfolio value in the sidebar to enable the Monte Carlo simulation.", icon="ℹ️")
-else:
-    _mc_col1, _mc_col2 = st.columns(2)
-    with _mc_col1:
-        _target_value = st.number_input(
-            "Target portfolio value ($)",
-            min_value=int(portfolio_value),
-            max_value=100_000_000,
-            value=int(portfolio_value * 2),
-            step=1000,
-            format="%d",
+    # Dollar drawdown translation
+    if portfolio_value and portfolio_value > 0 and not pd.isna(_max_dd):
+        _ann_ret = float(port_r_series.mean() * 252)
+        _dollar_loss = abs(_max_dd * portfolio_value)
+        if _ann_ret > 0 and _max_dd < 0:
+            _recovery_needed = 1 / (1 + _max_dd) - 1
+            _recovery_months = (np.log(1 + _recovery_needed) / np.log(1 + _ann_ret)) * 12
+            _recovery_txt = f"At the portfolio's historical average annual return of <b>{_ann_ret*100:.1f}%</b>, estimated recovery is <b>~{_recovery_months:.0f} months</b>."
+        else:
+            _recovery_txt = "Recovery time cannot be estimated — the portfolio's historical average annual return is negative or zero."
+        st.markdown(
+            f'<div class="info-bar">'
+            f"<b>Dollar Context</b> &nbsp; Based on a <b>${portfolio_value:,.0f}</b> portfolio &nbsp;&mdash;&nbsp; "
+            f"the max drawdown of <b>{_max_dd*100:.1f}%</b> represents a peak loss of <b>${_dollar_loss:,.0f}</b>. &nbsp;"
+            f"{_recovery_txt}"
+            f"</div>",
+            unsafe_allow_html=True,
         )
-    with _mc_col2:
-        _mc_years = st.slider("Time horizon (years)", 1, 30, 10)
 
-    _mc_fig, _prob, _med, _p10, _p90 = build_monte_carlo(
-        port_r_series, portfolio_value, _target_value, _mc_years, dark=dark
-    )
-    st.plotly_chart(_mc_fig, use_container_width=True)
+# ═══ PERFORMANCE ══════════════════════════════════════════════════════════════
+with tab_perf:
+    _section("Performance", "Cumulative Returns",
+             "Growth of the period. The bold line is your weighted portfolio, the dotted line is SPY. Hover to compare values.")
+    st.plotly_chart(charts.build_cumulative_chart(df, weights_map, dark=dark), width="stretch", key="ch_cum")
 
-    _prob_cls  = "bg" if _prob >= 0.6 else ("by" if _prob >= 0.35 else "br")
-    _prob_badge = f"<span class='mcard-badge {_prob_cls}'>{_prob*100:.0f}% probability</span>"
-    st.markdown(
-        f'<div class="info-bar">'
-        f"{_prob_badge} &nbsp; of reaching <b>${_target_value:,.0f}</b> within <b>{_mc_years} years</b> &nbsp;&mdash;&nbsp; "
-        f"Median outcome: <b>${_med:,.0f}</b> &nbsp;·&nbsp; "
-        f"10th %ile: <b>${_p10:,.0f}</b> &nbsp;·&nbsp; "
-        f"90th %ile: <b>${_p90:,.0f}</b>"
-        f"</div>",
-        unsafe_allow_html=True,
+    _section("Breakdown", "Asset Metrics",
+             "Per-holding risk and return over the selected period. SPY is the benchmark — Beta, Sharpe, and Sortino are measured relative to it. "
+             "Green = favorable &nbsp;·&nbsp; Amber = neutral &nbsp;·&nbsp; Rose = elevated risk.")
+    st.dataframe(style_asset_table(asset_df), width="stretch")
+
+    _section("Composition", "Sector Exposure",
+             "Where your money sits across GICS sectors, using your current weights. ETFs and funds without a sector are grouped as Other / ETF.")
+    st.plotly_chart(charts.build_sector_chart(df, weights_map, dark=dark), width="stretch", key="ch_sector_perf")
+
+# ═══ RISK ═════════════════════════════════════════════════════════════════════
+with tab_risk:
+    _section("Drawdowns", "Underwater Chart",
+             "How far below its previous peak the portfolio was at every point in time. "
+             "Depth shows how bad losses got; width shows how long recovery took.")
+    st.plotly_chart(charts.build_underwater_chart(port_r_series, dark=dark), width="stretch", key="ch_underwater")
+
+    _rc1, _rc2 = st.columns(2)
+    with _rc1:
+        _section("Volatility Over Time", "Rolling Volatility",
+                 "Risk isn't constant — this shows when your portfolio was calm and when it was turbulent, vs SPY.")
+        st.plotly_chart(charts.build_rolling_vol_chart(port_r_series, bench_r, dark=dark), width="stretch", key="ch_rvol")
+    with _rc2:
+        _section("Market Sensitivity", "Rolling Beta",
+                 "How strongly your portfolio tracked the market over time. Above 1 = amplifies market moves; below 1 = defensive.")
+        st.plotly_chart(charts.build_rolling_beta_chart(port_r_series, bench_r, dark=dark), width="stretch", key="ch_rbeta")
+
+# ═══ DIVERSIFICATION ══════════════════════════════════════════════════════════
+with tab_div:
+    _section("Diversification", "How Independent Are Your Holdings?",
+             "Diversification only works when holdings don't all move together. "
+             "The score combines average correlation between your holdings with how evenly your money is spread.")
+    _dc1, _dc2 = st.columns([1, 2])
+    with _dc1:
+        st.markdown(metric_card_html("DivScore", div_score), unsafe_allow_html=True)
+        _n_eff = core.effective_holdings(list(weights_map.values()))
+        st.markdown(
+            f'<div class="info-bar"><b>Effective positions</b> &nbsp; Your {len(held)} holdings '
+            f"behave like <b>~{_n_eff:.1f}</b> independent positions once weights are accounted for.</div>",
+            unsafe_allow_html=True,
+        )
+    with _dc2:
+        st.plotly_chart(charts.build_sector_chart(df, weights_map, dark=dark), width="stretch", key="ch_sector_div")
+
+    _section("Correlations", "Correlation Matrix",
+             "How closely each holding moves with the others. "
+             "<b style='color:#10b981'>Near 0 or negative</b> = independent or inverse moves (good diversification). "
+             "<b style='color:#f43f5e'>Near 1.0</b> = move together (lower diversification).")
+    st.dataframe(
+        corr.style.map(corr_cell_css).format("{:.2f}"),
+        width="stretch",
     )
+
+# ═══ WHAT-IF & OPTIMIZE ═══════════════════════════════════════════════════════
+with tab_whatif:
+    if opt is not None:
+        _section("Optimizer", "What the Same Holdings Could Do",
+                 "Two reference allocations found from your holdings' history: the mix that maximised risk-adjusted return (Max Sharpe), "
+                 "and the mix that minimised volatility (Min Volatility). "
+                 "<b>These describe the past, not the future</b> — treat them as a study aid, not advice.")
+
+        _oc = st.columns(3)
+        _opt_rows = [
+            ("Your Portfolio", cur_stats, ""),
+            ("Max Sharpe", opt["max_sharpe"], "bg"),
+            ("Min Volatility", opt["min_vol"], "bb"),
+        ]
+        for col, (lbl, s, cls) in zip(_oc, _opt_rows):
+            with col:
+                st.markdown(
+                    _scard(lbl,
+                           f"Sharpe {s['sharpe']:.2f}" if not pd.isna(s["sharpe"]) else "—",
+                           f"Return {s['ret']*100:.1f}% · Vol {s['vol']*100:.1f}%",
+                           cls),
+                    unsafe_allow_html=True,
+                )
+
+        _reb = pd.DataFrame({
+            "Current": {t: weights_map.get(t, 0.0) for t in held},
+            "Max Sharpe": opt["max_sharpe"]["weights"],
+            "Min Volatility": opt["min_vol"]["weights"],
+        }).loc[held]
+        _reb["Shift to Max Sharpe"] = _reb["Max Sharpe"] - _reb["Current"]
+        st.dataframe(
+            _reb.style.format("{:+.1%}", subset=["Shift to Max Sharpe"])
+                .format("{:.1%}", subset=["Current", "Max Sharpe", "Min Volatility"])
+                .map(lambda v: "color: #10b981" if v > 0.005 else ("color: #f43f5e" if v < -0.005 else "color: #888888"),
+                     subset=["Shift to Max Sharpe"]),
+            width="stretch",
+        )
+
+    _section("Risk vs. Return", "Efficient Frontier",
+             "Each dot is one of 2,500 randomly weighted combinations of your holdings, coloured by Sharpe ratio (pink = higher). "
+             "The star is your portfolio; the green and violet markers are the optimizer's reference mixes. "
+             "Portfolios toward the <b>upper-left</b> are best — higher return for less risk.")
+    _opt_points = None
+    if opt is not None:
+        _opt_points = {
+            "Max Sharpe": (opt["max_sharpe"]["vol"] * 100, opt["max_sharpe"]["ret"] * 100),
+            "Min Volatility": (opt["min_vol"]["vol"] * 100, opt["min_vol"]["ret"] * 100),
+        }
+    frontier_fig = charts.build_frontier_chart(df, weights_map, rfr=rfr, dark=dark, opt_points=_opt_points)
+    if frontier_fig:
+        st.plotly_chart(frontier_fig, width="stretch", key="ch_frontier")
+    else:
+        st.info("Select at least 2 holdings to see the efficient frontier.", icon="ℹ️")
+
+    # ── What-if sliders ──
+    _section("What-If", "Adjust Portfolio Weights",
+             "Drag the sliders to try different allocations. Metrics and sector breakdown update instantly. "
+             "Weights are normalised automatically — the total always equals 100%.")
+
+    def _apply_slider_weights(wmap):
+        for t in held:
+            st.session_state[f"cw_{t}"] = round(float(wmap.get(t, 0.0)) * 100, 1)
+
+    _bc1, _bc2, _bc3, _ = st.columns([1, 1, 1, 1.4])
+    _bc1.button("Reset to current", on_click=_apply_slider_weights, args=(weights_map,),
+                width="stretch")
+    if opt is not None:
+        _bc2.button("Apply Max Sharpe", on_click=_apply_slider_weights,
+                    args=(opt["max_sharpe"]["weights"],), width="stretch")
+        _bc3.button("Apply Min Volatility", on_click=_apply_slider_weights,
+                    args=(opt["min_vol"]["weights"],), width="stretch")
+
+    _w_cols = st.columns(min(len(held), 4))
+    _raw_w = {}
+    for i, ticker in enumerate(sorted(held)):
+        _default = round(float(weights_map.get(ticker, 0.0)) * 100, 1)
+        _raw_w[ticker] = _w_cols[i % len(_w_cols)].slider(
+            ticker, 0.0, 100.0, _default, 1.0, key=f"cw_{ticker}"
+        )
+
+    _total_w = sum(_raw_w.values())
+    if _total_w > 0:
+        _slider_weights = {t: _raw_w.get(t, 0.0) / _total_w for t in held}
+        _slider_full = {**{t: 0.0 for t in actual}, **_slider_weights}
+        _custom_port_dict, _ = core.compute_portfolio_metrics(
+            df, _slider_full, benchmark_ticker="SPY", risk_free_rate=rfr
+        )
+        _custom_vals = {**_custom_port_dict,
+                        "DivScore": core.diversification_score(corr, _slider_weights)}
+
+        eff_chips = " ".join(
+            f'<span class="chip">{t} {v*100:.1f}%</span>'
+            for t, v in sorted(_slider_weights.items(), key=lambda x: -x[1])
+        )
+        st.markdown(
+            f'<div class="info-bar"><b>Effective weights</b> &nbsp; {eff_chips}</div>',
+            unsafe_allow_html=True,
+        )
+
+        _adj_cols = st.columns(3)
+        for i, key in enumerate(_metric_keys):
+            with _adj_cols[i % 3]:
+                st.markdown(
+                    metric_card_html(key, _custom_vals.get(key, np.nan)),
+                    unsafe_allow_html=True,
+                )
+
+        st.plotly_chart(
+            charts.build_sector_chart(df, _slider_weights, dark=dark),
+            width="stretch", key="ch_sector_whatif",
+        )
+
+# ═══ PLANNING ═════════════════════════════════════════════════════════════════
+with tab_plan:
+    _section("Planning", "Monte Carlo Simulation",
+             "Simulates 1,000 possible futures for your portfolio based on its historical daily return and volatility. "
+             "Useful for understanding the range of outcomes — not a prediction. "
+             "<b>Assumes normally distributed returns</b> based on past data, which underestimates extreme events.")
+
+    if not (portfolio_value and portfolio_value > 0):
+        st.info(
+            "Enter your portfolio value in the sidebar (or switch to Custom amounts) to enable the Monte Carlo simulation.",
+            icon="ℹ️",
+        )
+    else:
+        _mc_col1, _mc_col2 = st.columns(2)
+        with _mc_col1:
+            _target_value = st.number_input(
+                "Target portfolio value ($)",
+                min_value=int(portfolio_value),
+                max_value=100_000_000,
+                value=int(portfolio_value * 2),
+                step=1000,
+                format="%d",
+            )
+        with _mc_col2:
+            _mc_years = st.slider("Time horizon (years)", 1, 30, 10)
+
+        _mc_fig, _prob, _med, _p10, _p90 = charts.build_monte_carlo(
+            port_r_series, portfolio_value, _target_value, _mc_years, dark=dark
+        )
+        st.plotly_chart(_mc_fig, width="stretch", key="ch_mc")
+
+        _prob_cls = "bg" if _prob >= 0.6 else ("by" if _prob >= 0.35 else "br")
+        _prob_badge = f"<span class='mcard-badge {_prob_cls}'>{_prob*100:.0f}% probability</span>"
+        st.markdown(
+            f'<div class="info-bar">'
+            f"{_prob_badge} &nbsp; of reaching <b>${_target_value:,.0f}</b> within <b>{_mc_years} years</b> &nbsp;&mdash;&nbsp; "
+            f"Median outcome: <b>${_med:,.0f}</b> &nbsp;·&nbsp; "
+            f"10th %ile: <b>${_p10:,.0f}</b> &nbsp;·&nbsp; "
+            f"90th %ile: <b>${_p90:,.0f}</b>"
+            f"</div>",
+            unsafe_allow_html=True,
+        )

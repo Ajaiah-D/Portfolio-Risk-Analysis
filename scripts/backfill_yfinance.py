@@ -121,7 +121,7 @@ def run():
             date.fromisoformat(earliest_in_db) - timedelta(days=1)
         ).strftime("%Y-%m-%d")
 
-        log.info(f"[{i}/{len(to_fill)}] {ticker}  {TARGET_START} → {fetch_end}")
+        log.info(f"[{i}/{len(to_fill)}] {ticker}  {TARGET_START} -> {fetch_end}")
 
         df = fetch_yf(ticker, TARGET_START, fetch_end)
 

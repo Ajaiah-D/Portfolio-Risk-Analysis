@@ -119,7 +119,7 @@ def run():
             date.fromisoformat(latest_date) + timedelta(days=1)
         ).strftime("%Y-%m-%d")
 
-        log.info(f"[{i}/{len(to_update)}] {ticker}  {fetch_start} → {yesterday}")
+        log.info(f"[{i}/{len(to_update)}] {ticker}  {fetch_start} -> {yesterday}")
 
         df = fetch_yf(ticker, fetch_start, yesterday)
 

@@ -162,9 +162,17 @@ card(
 card(
     "Equal Weighting",
     "Basic",
-    "This tool divides your money evenly across every stock in your portfolio. "
+    "Divides your money evenly across every holding. "
     "If you pick 5 stocks, each gets 20% of the total. This is the simplest approach — "
-    "it doesn't try to predict which stock will do best.",
+    "it doesn't try to predict which stock will do best. It's the tool's default mode.",
+)
+card(
+    "Custom Weighting",
+    "Basic",
+    "Instead of splitting evenly, you enter the actual dollar amount you hold in each position. "
+    "Every metric and chart then describes <i>your real portfolio</i>, not a hypothetical equal split. "
+    "Switch to 'Custom amounts ($)' in the sidebar to use it.",
+    "If you hold $6,000 of QQQ and $2,000 of XOM, QQQ drives 3× more of your risk and return."
 )
 
 # ── Risk & Volatility ────────────────────────────────────────────────────────
@@ -211,6 +219,21 @@ card(
     "CVaR is always a larger loss than VaR.",
     "If VaR is −2%, a CVaR of −3% means that when bad days happen, the average loss is 3%."
 )
+card(
+    "Underwater (Drawdown) Chart",
+    "Risk",
+    "Shows how far below its previous peak your portfolio was at every point in time. "
+    "The depth of each dip is how bad the loss got; the width is how long it took to recover. "
+    "A portfolio spending long stretches 'underwater' tests your patience even if it recovers eventually.",
+    "A dip reaching −20% that takes a year to climb back to zero means 12 months of watching your money sit below its high."
+)
+card(
+    "Rolling Volatility",
+    "Risk",
+    "Volatility measured over a sliding window (about 3 months) instead of the whole period. "
+    "It shows <i>when</i> your portfolio was calm and when it was turbulent — "
+    "a single overall number can hide the fact that most of the risk happened in one short stretch.",
+)
 
 # ── Performance Metrics ─────────────────────────────────────────────────────
 st.markdown('<div class="section-title">Performance</div>', unsafe_allow_html=True)
@@ -244,6 +267,12 @@ card(
     "Beta below 0 = tends to move opposite to the market.",
     "A Beta of 1.5 means when the market drops 10%, this stock tends to drop 15%."
 )
+card(
+    "Rolling Beta",
+    "Performance",
+    "Beta measured over a sliding window so you can see how your portfolio's market sensitivity changed over time. "
+    "A portfolio can average a Beta of 1.0 while actually swinging between defensive (0.7) and aggressive (1.3) phases.",
+)
 
 # ── Charts & Analysis ────────────────────────────────────────────────────────
 st.markdown('<div class="section-title">Charts</div>', unsafe_allow_html=True)
@@ -255,7 +284,7 @@ card(
     "Chart",
     "Shows the total growth of $1 invested at the start of the period. "
     "If the line is at 50%, a $1,000 investment would now be worth $1,500. "
-    "The bold line on the chart is your equal-weight portfolio; the dotted line is SPY.",
+    "The bold line on the chart is your weighted portfolio; the dotted line is SPY.",
     "A cumulative return of 80% over 5 years means the investment more than doubled after 5 years."
 )
 card(
@@ -264,8 +293,27 @@ card(
     "A scatter plot showing 2,500 randomly weighted versions of your portfolio, each dot representing a "
     "different way to split your money across your chosen stocks. "
     "Dots toward the upper-left are best — higher return for lower risk. "
-    "Your equal-weight portfolio (the star) shows where your current split sits in comparison. "
-    "This is a visualisation, not a recommendation — it doesn't tell you the 'best' weighting.",
+    "The star shows where your current weights sit in comparison; the marked points show the "
+    "Max Sharpe and Min Volatility reference mixes. "
+    "All of it describes the past, not the future — treat it as a study aid, not a recommendation.",
+)
+card(
+    "Max Sharpe / Min Volatility",
+    "Chart",
+    "Two reference allocations the tool finds from your holdings' history: "
+    "the weighting that would have delivered the best risk-adjusted return (Max Sharpe), and the weighting "
+    "that would have been the calmest ride (Min Volatility). "
+    "They show what the <i>same holdings</i> could look like with different weights — "
+    "but past-optimal weights are not guaranteed to be future-optimal.",
+)
+card(
+    "Monte Carlo Simulation",
+    "Chart",
+    "Simulates a thousand possible futures for your portfolio by repeatedly rolling dice weighted by its "
+    "historical average return and volatility. The result is a <i>range</i> of outcomes — median, optimistic, pessimistic — "
+    "and the probability of reaching a target value. It assumes returns are normally distributed, "
+    "which understates extreme events, so treat the tails with skepticism.",
+    "'65% probability of reaching $50,000 in 10 years' means: in 650 of the 1,000 simulated futures, you got there."
 )
 card(
     "Correlation Matrix",
@@ -285,6 +333,22 @@ card(
     "The practice of spreading your investments across different stocks, sectors, or asset types "
     "so that a bad day for one doesn't sink your whole portfolio. "
     "Holding 10 unrelated stocks is less risky than holding 10 stocks that all do the same thing.",
+)
+card(
+    "Diversification Score",
+    "Chart",
+    "A 0–100 score combining two things: how independently your holdings move (average correlation) "
+    "and how evenly your money is spread (effective positions). "
+    "All-tech portfolios score low because tech stocks move together; mixing in bonds, gold, or "
+    "international funds raises the score because they move to a different rhythm.",
+    "Five tech stocks might score 15. The same money across tech, healthcare, energy, and a bond ETF might score 60+."
+)
+card(
+    "Effective Positions",
+    "Chart",
+    "How many truly independent positions your portfolio behaves like, once weights are accounted for. "
+    "Ten holdings where one position is 80% of the money behaves like ~1.5 positions, not 10. "
+    "The closer this number is to your actual holding count, the more evenly your risk is spread.",
 )
 
 # ── Sectors ──────────────────────────────────────────────────────────────────
