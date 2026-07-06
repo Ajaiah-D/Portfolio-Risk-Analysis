@@ -1,0 +1,90 @@
+"""Streamlit AppTest smoke tests — run the real app end-to-end headlessly.
+
+These need the local price database, so they are skipped when it is absent
+(e.g. on a fresh clone before ingestion).
+"""
+import os
+import sys
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+import pytest
+from streamlit.testing.v1 import AppTest
+
+APP = "streamlit_app/Portfolio_Analyzer.py"
+DB = "data/portfolio_data.db"
+
+pytestmark = pytest.mark.skipif(
+    not os.path.exists(DB), reason="price database not present"
+)
+
+
+def make_app():
+    return AppTest.from_file(APP, default_timeout=60)
+
+
+def test_empty_state_renders():
+    at = make_app().run()
+    assert not at.exception
+    # onboarding: example button present, no analysis yet
+    assert any("example" in b.label.lower() for b in at.button)
+    assert len(at.tabs) == 0
+
+
+def test_example_portfolio_full_run():
+    at = make_app().run()
+    example_btn = next(b for b in at.button if "example" in b.label.lower())
+    example_btn.click().run()
+    assert not at.exception
+    assert len(at.tabs) == 6
+    # metric cards + insights are markdown blocks; sanity check content exists
+    all_md = " ".join(str(m.value) for m in at.markdown)
+    assert "Sharpe" in all_md
+    assert "mcard" in all_md
+    assert "insight" in all_md
+
+
+def test_run_with_manual_selection():
+    at = make_app()
+    at.session_state["stock_sel"] = []
+    at.run()
+    # pick two stocks via session state (labels must match universe format)
+    labels = [o for o in at.multiselect(key="stock_sel").options if o.startswith(("AAPL", "MSFT"))]
+    at.multiselect(key="stock_sel").set_value(labels[:2])
+    run_btn = next(b for b in at.button if "Run Analysis" in b.label)
+    run_btn.click().run()
+    assert not at.exception
+    assert len(at.tabs) == 6
+
+
+def test_url_prefill_autoruns():
+    at = make_app()
+    at.query_params["t"] = "AAPL,MSFT,JNJ"
+    at.query_params["h"] = "3"
+    at.query_params["r"] = "4"
+    at.run()
+    assert not at.exception
+    assert len(at.tabs) == 6
+    assert at.session_state["horizon"] == "3 Years"
+    assert at.session_state["rfr_pct"] == 4.0
+
+
+def test_glossary_page_renders():
+    at = AppTest.from_file("streamlit_app/pages/Glossary.py", default_timeout=30).run()
+    assert not at.exception
+    all_md = " ".join(str(m.value) for m in at.markdown)
+    for term in ("Sharpe Ratio", "Monte Carlo", "Diversification Score", "Rolling Beta"):
+        assert term in all_md
+
+
+def test_custom_amounts_mode():
+    at = make_app()
+    at.query_params["t"] = "AAPL,MSFT"
+    at.query_params["a"] = "3000,1000"
+    at.run()
+    assert not at.exception
+    assert at.session_state["wmode"] == "Custom amounts ($)"
+    assert len(at.tabs) == 6
+    # custom mode derives portfolio value -> Planning tab should have MC inputs
+    all_md = " ".join(str(m.value) for m in at.markdown)
+    assert "Dollar Context" in all_md

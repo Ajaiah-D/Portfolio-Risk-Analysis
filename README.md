@@ -1,21 +1,22 @@
 # Portfolio Risk Analysis
 
-An interactive portfolio risk dashboard built with Streamlit, backed by a local SQLite database of historical price data sourced from Massive.com (formerly Polygon.io) and yfinance.
+An interactive portfolio risk dashboard built with Streamlit, backed by a local SQLite database of historical price data sourced from Massive.com (formerly Polygon.io) and yfinance. Built for two audiences at once: people who want to understand what their portfolio actually does, and people learning what these metrics mean in the first place — every number comes with a plain-English interpretation and a full glossary.
 
 ---
 
 ## What It Does
 
-- Select up to 25 S&P 500 stocks and/or ETFs; SPY is always included as the market benchmark
-- Filter the stock universe by GICS sector before picking
-- Choose a time horizon (1, 3, 5, or 10 years) and a risk-free rate (adjustable slider)
-- Computes per-asset risk metrics: Sharpe ratio, Sortino ratio, Beta, Max Drawdown, VaR (5%), and CVaR
-- Computes the same metrics for the portfolio treated as a single equal-weight position
-- Renders color-coded metric cards with qualitative interpretations and reference ranges
-- Plots cumulative returns (individual stocks + equal-weight portfolio vs. SPY benchmark)
-- Plots a Monte Carlo efficient frontier (2,500 random weight combinations) coloured by Sharpe ratio
-- Shows a pairwise correlation matrix with heatmap styling
-- Full dark/light mode toggle
+- Select up to 25 S&P 500 stocks and/or ETFs; SPY is always included as the market benchmark (and can also be held as a position)
+- **Analyze your real portfolio**: enter the dollar amount you hold in each position, or use equal weighting to explore
+- Filter the stock universe by GICS sector; choose a 1–10 year horizon and adjustable risk-free rate
+- **Overview tab** — scorecard vs SPY (return, volatility, Sharpe, max drawdown), seven interpreted metric cards, and automatic plain-English insights (correlation clusters, sector concentration, risk drivers, worst month, improvement opportunities)
+- **Performance tab** — cumulative returns vs SPY, per-asset metrics table, sector exposure
+- **Risk tab** — underwater (drawdown) chart, rolling volatility, and rolling beta, showing *when* risk showed up rather than one number for the whole period
+- **Diversification tab** — 0–100 diversification score (correlation × effective positions), correlation matrix heatmap
+- **What-If & Optimize tab** — approximate max-Sharpe and min-volatility reference allocations with a suggested rebalance table, an efficient frontier (2,500 random portfolios), and live weight sliders that update every metric instantly
+- **Planning tab** — Monte Carlo simulation (1,000 paths) with target value and probability of reaching it
+- Portfolios are saved in the page URL — bookmark or share a link and the analysis reloads
+- Full dark/light mode, onboarding flow with a one-click example portfolio
 
 ---
 
@@ -23,34 +24,49 @@ An interactive portfolio risk dashboard built with Streamlit, backed by a local 
 
 ```
 Massive.com API ──► fetch_data.py ──► store_data.py ──► SQLite (daily_prices, tickers_meta)
-yfinance        ──► backfill_yfinance.py ─────────────► SQLite (gap fill only)
+yfinance        ──► backfill_yfinance.py ─────────────► SQLite (gap fill)
+yfinance        ──► refresh_prices.py ────────────────► SQLite (forward refresh)
 
-SQLite ──► data/helpers.py ──► metrics/core.py ──► streamlit_app/app.py ──► Browser
+SQLite ──► data/helpers.py ──► metrics/ (core, optimize)
+                                  │
+                       streamlit_app/ (Portfolio_Analyzer + charts, insights, interpret, style)
 ```
 
-Data is ingested once (or re-run to refresh) and stored locally. The Streamlit app reads only from SQLite — no live API calls at runtime.
+Data is ingested once and refreshed forward on demand. The Streamlit app reads only from SQLite — no live API calls at runtime.
+
+| Module | Responsibility |
+|---|---|
+| `metrics/core.py` | Pure-function metric computations (Sharpe, Sortino, Beta, drawdown, VaR/CVaR, diversification score) |
+| `metrics/optimize.py` | Long-only max-Sharpe / min-volatility search (iterated Dirichlet sampling — no solver dependency) |
+| `streamlit_app/charts.py` | All Plotly chart builders (pure functions of data + theme) |
+| `streamlit_app/insights.py` | Rule-based plain-English findings engine |
+| `streamlit_app/interpret.py` | Metric interpretations, badge ranges, card rendering, table stylers |
+| `streamlit_app/style.py` | CSS theming (light/dark via custom properties) |
+| `streamlit_app/Portfolio_Analyzer.py` | Orchestration: sidebar, state, tabs |
 
 ---
 
 ## Key Engineering Decisions
 
-**Idempotent ingestion** — both backfill scripts use `INSERT OR IGNORE` against a `(ticker, date)` unique constraint, so they can be interrupted and re-run without duplicates.
+**Real weights, alignment-safe** — portfolio functions accept `{ticker: weight}` dicts and align them to the returns matrix internally, so column ordering can never silently mismatch weights.
 
-**Dual data sources for history** — Massive.com's free tier returns limited history per call (rate-limited at 5 req/min with a 13s sleep). A separate yfinance backfill script fills gaps back to 2020-01-01 with no enforced rate limit, using a shorter 0.5s courtesy sleep.
+**Solver-free optimisation** — max-Sharpe / min-vol weights are found by iterated Dirichlet sampling (sample the simplex, concentrate around the incumbent, repeat). Approximate but deterministic, long-only by construction, and dependency-free; validated against the two-asset analytic solution in tests.
 
-**Parameterized SQL with dynamic `IN` clause** — `helpers.get_price_data` builds `IN (?,?,?)` by joining `?` placeholders, never interpolating user input into the query string.
+**Diversification score with two components** — weighted average pairwise correlation (mapped over the realistic 0–0.8 range) × effective number of positions (`1/Σw²`), so both "everything moves together" and "one position dominates" pull the score down.
 
-**Date buffer on time horizons** — the app adds an extra 60–200 day buffer when calculating `start_date` (depending on horizon) to account for trading calendar gaps and ensure the requested number of trading years is actually present in the result.
+**Idempotent ingestion** — all ingestion scripts use `INSERT OR IGNORE` against a `(ticker, date)` unique constraint, so they can be interrupted and re-run without duplicates.
 
-**SPY always injected as benchmark** — the app inserts SPY at index 0 of the ticker list before querying, so Beta, Sharpe, and Sortino computations always have a benchmark available regardless of user selection.
+**Dual data sources for history** — Massive.com's free tier is rate-limited (5 req/min); yfinance fills history back to 2020-01-01 and refreshes forward with no enforced limit.
 
-**30-ticker hard cap** — `helpers.py` raises a `ValueError` above 30 tickers to avoid runaway query sizes; the UI caps user picks at 29 (+SPY = 30).
+**Parameterized SQL with dynamic `IN` clause** — `helpers.get_price_data` builds `IN (?,?,?)` from placeholders, never interpolating user input into the query string.
 
-**Reproducible efficient frontier** — `np.random.default_rng(42)` seeds the random portfolio generation. Weights are drawn from a Dirichlet distribution to guarantee they sum to 1 without renormalization.
+**SPY as benchmark vs holding** — SPY is always fetched for Beta/benchmark computations, but only counts as a portfolio position if the user explicitly selects it.
 
-**Dark mode CSS scoping workaround** — Streamlit popovers render in a separate stacking context where CSS custom properties (`var(--bg)`) do not resolve. Dark mode injects a second hardcoded CSS block with literal colour values specifically targeting popover elements.
+**Shareable state in the URL** — the selected tickers, amounts, horizon, and risk-free rate are serialised into query params after each run, making any analysis a bookmarkable link.
 
-**`@st.cache_data` on universe load** — the S&P 500 constituent CSV and DB ticker query are cached so sector filters and picker re-renders don't hit the DB on every interaction.
+**Dark mode CSS scoping workaround** — Streamlit popovers render in a separate stacking context where CSS custom properties don't resolve; dark mode injects a second hardcoded CSS block targeting popover elements.
+
+**Tested at three levels** — unit tests for the metrics engine (hand-checked values), analytic-solution tests for the optimizer, and end-to-end `streamlit.testing.AppTest` runs that execute the real app headlessly (empty state, example flow, URL prefill, custom amounts).
 
 ---
 
@@ -62,13 +78,16 @@ All metrics are computed from daily percentage returns over the selected time wi
 |---|---|---|
 | Sharpe ratio | `(mean_excess_return × 252) / (std × √252)` | Annualised |
 | Sortino ratio | Same numerator; denominator uses downside std only (`returns < 0`) | Penalises downside vol only |
-| Beta | `cov(asset, benchmark) / var(benchmark)` | Benchmark is SPY |
-| Max Drawdown | Cumulative product of `(1 + r)`, peak-to-trough percentage | Worst single drop over period |
+| Beta | `cov(asset, benchmark) / var(benchmark)`, both ddof=1 | Benchmark is SPY |
+| Max Drawdown | Cumulative product of `(1 + r)`, peak-to-trough percentage | Also shown over time (underwater chart) |
 | VaR (5%) | 5th percentile of daily return distribution | Historical, not parametric |
 | CVaR | Mean of all returns ≤ VaR | Expected loss in the worst 5% of days |
-| Efficient frontier | 2,500 Dirichlet-sampled random weight vectors | Illustrative only — not an optimiser |
+| Diversification score | `100 × clip((0.8 − avg_corr)/0.8) × (1 − 1/n_eff)` | Correlation + weight concentration |
+| Efficient frontier | 2,500 Dirichlet-sampled random weight vectors | Illustrative |
+| Max Sharpe / Min Vol | Iterated Dirichlet sampling, 5 refinement rounds | Approximate long-only optimum |
+| Monte Carlo | 1,000 paths, daily normal draws from historical μ/σ | Understates tail risk (stated in-app) |
 
-**Limitation:** the portfolio is always equal-weighted. There is no mean-variance optimisation — the efficient frontier is a visualisation tool to show where the current portfolio sits relative to the random sample, not a recommendation engine.
+**Limitations:** optimizer allocations and Monte Carlo outcomes describe the past sample, not the future — the app labels them as study aids, not recommendations. Monte Carlo assumes normally distributed returns.
 
 ---
 
@@ -82,18 +101,24 @@ git clone <repo-url>
 cd Portfolio-Risk-Analysis
 pip install -r requirements.txt
 
-# 2. Add your Polygon API key
+# 2. Add your API key
 echo "POLYGON_API_KEY=your_key_here" > scripts/.env
 
 # 3. Ingest price data (one-time; takes ~5 min on free tier due to rate limiting)
 python scripts/ingest_all_tickers.py
 
 # 4. Optional: backfill history to 2020-01-01
-python scripts/backfill_history.py      # via Polygon (slower, rate-limited)
+python scripts/backfill_history.py      # via Massive.com (slower, rate-limited)
 python scripts/backfill_yfinance.py     # via yfinance (faster, fills gaps)
 
-# 5. Run the app
+# 5. Keep data current (run any time; idempotent)
+python scripts/refresh_prices.py
+
+# 6. Run the app
 python -m streamlit run streamlit_app/Portfolio_Analyzer.py
+
+# Run the tests
+python -m pytest tests/
 ```
 
 ---
@@ -102,11 +127,16 @@ python -m streamlit run streamlit_app/Portfolio_Analyzer.py
 
 ```
 ├── streamlit_app/
-│   ├── Portfolio_Analyzer.py   # All UI, chart builders, metric card rendering
+│   ├── Portfolio_Analyzer.py   # Orchestration: sidebar, session state, tabs
+│   ├── charts.py               # Plotly chart builders
+│   ├── insights.py             # Rule-based plain-English findings
+│   ├── interpret.py            # Metric interpretations + card rendering
+│   ├── style.py                # CSS theming (light/dark)
 │   └── pages/
-│       └── Glossary.py         # Plain-English definitions of every financial term
+│       └── Glossary.py         # Plain-English definitions of every term used
 ├── metrics/
-│   └── core.py                 # Pure-function metric computations (Sharpe, VaR, etc.)
+│   ├── core.py                 # Pure-function metric computations
+│   └── optimize.py             # Max-Sharpe / min-vol weight search
 ├── data/
 │   ├── helpers.py              # Parameterized SQLite query layer
 │   └── portfolio_data.db       # Local price database (git-ignored)
@@ -114,10 +144,15 @@ python -m streamlit run streamlit_app/Portfolio_Analyzer.py
 │   ├── fetch_data.py           # Massive.com API client (formerly Polygon.io)
 │   ├── store_data.py           # SQLite write functions
 │   ├── ingest_all_tickers.py   # Initial ingestion for S&P 500 + ETF list
-│   ├── backfill_history.py     # Extends history via Polygon (rate-limited)
-│   ├── backfill_yfinance.py    # Fills gaps via yfinance
+│   ├── backfill_history.py     # Extends history via Massive.com (rate-limited)
+│   ├── backfill_yfinance.py    # Fills historical gaps via yfinance
+│   ├── refresh_prices.py       # Forward refresh to yesterday via yfinance
 │   ├── utils.py                # API key loading, rate-limit sleep
 │   └── .env                    # API key (git-ignored)
+├── tests/
+│   ├── test_core.py            # Metrics engine unit tests
+│   ├── test_optimize.py        # Optimizer vs analytic solutions
+│   └── test_app.py             # Headless end-to-end app runs (AppTest)
 ├── tickers/
 │   └── constituents.csv        # S&P 500 constituents with GICS sectors
 └── dags/
@@ -135,6 +170,7 @@ python -m streamlit run streamlit_app/Portfolio_Analyzer.py
 | Data manipulation | pandas, NumPy |
 | Database | SQLite (via `sqlite3`) |
 | Primary data source | Massive.com REST API (formerly Polygon.io) |
-| Backfill data source | yfinance |
+| Backfill / refresh source | yfinance |
 | Styling | CSS custom properties injected via `st.markdown` |
+| Testing | pytest + `streamlit.testing.AppTest` |
 | Language | Python 3.10+ |
