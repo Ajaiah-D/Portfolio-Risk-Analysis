@@ -50,9 +50,19 @@ def inject_css(dark: bool):
     --neutral-dim:rgba(139,140,248,0.13);
 }}
 
-html, body, [class*="css"] {{ font-family: 'Inter', sans-serif; }}
+html, body, [class*="css"] {{
+    font-family: 'Inter', sans-serif;
+    -webkit-font-smoothing: antialiased;
+}}
 #MainMenu, footer {{ visibility: hidden; }}
-.block-container {{ padding-top: 2rem; padding-bottom: 3rem; max-width: 1200px; }}
+.block-container {{
+    padding-top: 2rem; padding-bottom: 3rem; max-width: 1200px;
+    animation: pageFade 0.35s ease-out;
+}}
+@keyframes pageFade {{
+    from {{ opacity: 0; transform: translateY(4px); }}
+    to   {{ opacity: 1; transform: none; }}
+}}
 
 /* ── Global text colour (follows theme) ── */
 p, span, label, div, h1, h2, h3, h4, li, caption,
@@ -154,29 +164,87 @@ header[data-testid="stHeader"] {{
 }}
 
 /* ── Tabs ── */
+[data-testid="stTabs"] [data-baseweb="tab-list"] {{
+    gap: 0.35rem;
+}}
 [data-testid="stTabs"] button {{
     color: var(--text2) !important;
     font-weight: 600;
+    font-size: 0.88rem;
+    padding: 0.55rem 0.9rem;
+    border-radius: 8px 8px 0 0;
+    transition: color 0.15s ease, background 0.15s ease;
+}}
+[data-testid="stTabs"] button:hover {{
+    color: var(--text) !important;
+    background: var(--bg2);
 }}
 [data-testid="stTabs"] button[aria-selected="true"] {{
     color: var(--pink) !important;
 }}
 [data-testid="stTabs"] [data-baseweb="tab-highlight"] {{
     background-color: var(--pink) !important;
+    height: 2.5px;
+    border-radius: 2px;
 }}
 [data-testid="stTabs"] [data-baseweb="tab-border"] {{
     background-color: var(--border) !important;
 }}
 
+/* ── Buttons ── */
+.stButton > button, [data-testid="stBaseButton-primary"], [data-testid="stBaseButton-secondary"] {{
+    border-radius: 9px !important;
+    font-weight: 600 !important;
+    transition: transform 0.12s ease, box-shadow 0.12s ease, filter 0.12s ease;
+}}
+.stButton > button:hover {{
+    transform: translateY(-1px);
+    box-shadow: 0 4px 14px var(--shadow);
+    filter: brightness(1.03);
+}}
+.stButton > button:active {{ transform: translateY(0); }}
+[data-testid="stBaseButton-primary"] {{ color: #ffffff !important; }}
+
+/* ── Inputs: soften corners ── */
+[data-baseweb="select"] > div,
+[data-baseweb="input"],
+[data-testid="stNumberInput"] div[data-baseweb="input"] {{
+    border-radius: 9px !important;
+}}
+
+/* ── Segmented controls (weighting, time horizon) ── */
+[data-testid="stSegmentedControl"] button {{
+    background-color: var(--bg3) !important;
+    color: var(--text2) !important;
+    border-color: var(--border) !important;
+    font-weight: 600;
+}}
+[data-testid="stSegmentedControl"] button p {{
+    color: inherit !important;
+    font-size: 0.8rem !important;
+}}
+[data-testid="stSegmentedControl"] button[aria-checked="true"],
+[data-testid="stSegmentedControl"] button[kind="segmented_controlActive"] {{
+    background-color: var(--pink-dim) !important;
+    color: var(--pink) !important;
+    border-color: var(--pink) !important;
+}}
+
 /* ── Typography ── */
 .hero-title {{
-    font-size: 2rem; font-weight: 700; color: var(--text);
-    letter-spacing: -0.5px; margin: 0 0 0.35rem 0;
+    font-size: 2.3rem; font-weight: 700; color: var(--text);
+    letter-spacing: -0.8px; margin: 0 0 0.35rem 0;
 }}
-.hero-title span {{ color: var(--pink); }}
+.hero-title span {{
+    background: linear-gradient(92deg, var(--pink) 20%, var(--neutral) 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: var(--pink); /* fallback */
+}}
 .hero-sub {{
-    font-size: 0.9rem; color: var(--text2);
-    margin: 0 0 1.8rem 0; line-height: 1.6;
+    font-size: 0.92rem; color: var(--text2);
+    margin: 0 0 1.6rem 0; line-height: 1.65; max-width: 46rem;
 }}
 
 /* ── Section headers ── */
@@ -234,10 +302,16 @@ hr.section-rule {{
 .scard {{
     background: var(--card);
     border: 1px solid var(--border);
-    border-radius: 12px;
+    border-radius: 13px;
     padding: 0.85rem 1rem;
     box-shadow: 0 1px 4px var(--shadow);
     margin-bottom: 0.55rem;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}}
+.scard:hover {{
+    transform: translateY(-2px);
+    box-shadow: 0 6px 18px var(--shadow);
+    border-color: var(--pink);
 }}
 .scard-label {{
     font-size: 0.63rem; font-weight: 700;
@@ -270,10 +344,16 @@ hr.section-rule {{
 .mcard {{
     background: var(--card);
     border: 1px solid var(--border);
-    border-radius: 12px;
+    border-radius: 13px;
     padding: 1.1rem 1.2rem;
     box-shadow: 0 1px 4px var(--shadow);
     margin-bottom: 0.55rem;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}}
+.mcard:hover {{
+    transform: translateY(-2px);
+    box-shadow: 0 6px 18px var(--shadow);
+    border-color: var(--pink);
 }}
 .mcard-label {{
     font-size: 0.67rem; font-weight: 700;
@@ -316,15 +396,23 @@ hr.section-rule {{
 .step-card {{
     background: var(--bg2);
     border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 1.1rem 1.2rem;
+    border-radius: 13px;
+    padding: 1.15rem 1.25rem;
     min-height: 7.5rem;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+}}
+.step-card:hover {{
+    transform: translateY(-2px);
+    box-shadow: 0 6px 18px var(--shadow);
+    border-color: var(--pink);
 }}
 .step-num {{
-    display: inline-block; width: 1.6rem; height: 1.6rem;
-    border-radius: 50%; background: var(--pink-dim); color: var(--pink);
-    font-weight: 700; font-size: 0.8rem; text-align: center; line-height: 1.6rem;
-    margin-bottom: 0.5rem;
+    display: inline-block; width: 1.7rem; height: 1.7rem;
+    border-radius: 50%;
+    background: linear-gradient(135deg, var(--pink-dim), var(--neutral-dim));
+    color: var(--pink);
+    font-weight: 700; font-size: 0.8rem; text-align: center; line-height: 1.7rem;
+    margin-bottom: 0.55rem;
 }}
 .step-title {{ font-size: 0.9rem; font-weight: 600; color: var(--text); margin-bottom: 0.25rem; }}
 .step-desc {{ font-size: 0.78rem; color: var(--text2); line-height: 1.5; }}
@@ -338,8 +426,24 @@ hr.section-rule {{
 .sb-label {{
     font-size: 0.7rem; font-weight: 700;
     text-transform: uppercase; letter-spacing: 0.09em;
-    color: var(--text2); margin-bottom: 0.25rem; display: block;
+    color: var(--pink); margin-bottom: 0.25rem; display: block;
 }}
+
+/* ── Sidebar section separator (replaces heavy --- rules) ── */
+.sb-gap {{
+    border-top: 1px solid var(--border);
+    margin: 1.1rem 0 0.9rem 0;
+}}
+
+/* ── Sidebar: tighten vertical rhythm ── */
+[data-testid="stSidebar"] .block-container {{ padding-top: 1.2rem; }}
+[data-testid="stSidebar"] [data-testid="stVerticalBlock"] {{ gap: 0.55rem; }}
+
+/* ── Insight cards: gentle hover ── */
+.insight {{
+    transition: border-color 0.15s ease, transform 0.15s ease;
+}}
+.insight:hover {{ transform: translateX(2px); }}
 </style>
 """,
         unsafe_allow_html=True,
