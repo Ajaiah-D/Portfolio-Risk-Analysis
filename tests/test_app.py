@@ -46,11 +46,13 @@ def test_example_portfolio_full_run():
 
 def test_run_with_manual_selection():
     at = make_app()
-    at.session_state["stock_sel"] = []
+    at.session_state["holdings_sel"] = []
     at.run()
-    # pick two stocks via session state (labels must match universe format)
-    labels = [o for o in at.multiselect(key="stock_sel").options if o.startswith(("AAPL", "MSFT"))]
-    at.multiselect(key="stock_sel").set_value(labels[:2])
+    # pick a stock and an ETF from the unified picker (labels match universe format)
+    opts = at.multiselect(key="holdings_sel").options
+    labels = [o for o in opts if o.startswith("AAPL")][:1] + [o for o in opts if o.startswith("QQQ")][:1]
+    assert len(labels) == 2, "unified picker should offer both stocks and ETFs"
+    at.multiselect(key="holdings_sel").set_value(labels)
     run_btn = next(b for b in at.button if "Run Analysis" in b.label)
     run_btn.click().run()
     assert not at.exception
@@ -65,7 +67,7 @@ def test_url_prefill_autoruns():
     at.run()
     assert not at.exception
     assert len(at.tabs) == 6
-    assert at.session_state["horizon"] == "3 Years"
+    assert at.session_state["horizon"] == "3Y"
     assert at.session_state["rfr_pct"] == 4.0
 
 

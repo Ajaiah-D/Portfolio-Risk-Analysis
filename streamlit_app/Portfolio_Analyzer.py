@@ -63,8 +63,9 @@ const_df, etfs_df, all_sectors = load_universe()
 
 EQUAL_MODE = "Equal weight"
 CUSTOM_MODE = "Custom amounts ($)"
-_HORIZON_LABELS = {"1": "1 Year", "3": "3 Years", "5": "5 Years", "10": "10 Years"}
+_HORIZON_LABELS = {"1": "1Y", "3": "3Y", "5": "5Y", "10": "10Y"}
 _HORIZON_NUMS = {v: k for k, v in _HORIZON_LABELS.items()}
+_HORIZON_DISPLAY = {"1Y": "1 Year", "3Y": "3 Years", "5Y": "5 Years", "10Y": "10 Years"}
 
 
 def extract_symbol(label):
@@ -78,11 +79,12 @@ if "t" in _qp and not st.session_state.get("qp_loaded"):
     st.session_state.qp_loaded = True
     _syms = [s.strip().upper() for s in _qp["t"].split(",") if s.strip()]
     _sp500 = set(const_df["Symbol"])
-    st.session_state["stock_sel"] = const_df[const_df["Symbol"].isin(_syms)]["label"].tolist()
+    _labels = const_df[const_df["Symbol"].isin(_syms)]["label"].tolist()
     if not etfs_df.empty:
         _etf_syms = [s for s in _syms if s not in _sp500]
-        st.session_state["etf_sel"] = etfs_df[etfs_df["symbol"].isin(_etf_syms)]["label"].tolist()
-    st.session_state["horizon"] = _HORIZON_LABELS.get(_qp.get("h", "5"), "5 Years")
+        _labels += etfs_df[etfs_df["symbol"].isin(_etf_syms)]["label"].tolist()
+    st.session_state["holdings_sel"] = _labels
+    st.session_state["horizon"] = _HORIZON_LABELS.get(_qp.get("h", "5"), "5Y")
     try:
         _r = float(_qp.get("r", 5.0))
         st.session_state["rfr_pct"] = min(max(round(_r * 2) / 2, 0.0), 10.0)
@@ -108,14 +110,21 @@ if "t" in _qp and not st.session_state.get("qp_loaded"):
 # ── Example portfolio (onboarding) ────────────────────────────────────────────
 def _load_example():
     ex_stocks = ["AAPL", "MSFT", "JNJ", "XOM", "PG"]
-    st.session_state["stock_sel"] = const_df[const_df["Symbol"].isin(ex_stocks)]["label"].tolist()
+    _labels = const_df[const_df["Symbol"].isin(ex_stocks)]["label"].tolist()
     if not etfs_df.empty:
-        st.session_state["etf_sel"] = etfs_df[etfs_df["symbol"].isin(["QQQ", "GLD"])]["label"].tolist()
+        _labels += etfs_df[etfs_df["symbol"].isin(["QQQ", "GLD"])]["label"].tolist()
+    st.session_state["holdings_sel"] = _labels
     st.session_state["wmode"] = EQUAL_MODE
     st.session_state.analysis_run = True
 
 
 # ── Sidebar ───────────────────────────────────────────────────────────────────
+# Session defaults set before widgets so preset values (URL prefill, example
+# button) never conflict with widget default arguments.
+st.session_state.setdefault("horizon", "5Y")
+st.session_state.setdefault("wmode", EQUAL_MODE)
+st.session_state.setdefault("rfr_pct", 5.0)
+
 with st.sidebar:
 
     new_dark = st.toggle("Dark mode", value=st.session_state.dark_mode, key="dark_toggle")
@@ -123,71 +132,53 @@ with st.sidebar:
         st.session_state.dark_mode = new_dark
         st.rerun()
 
-    st.markdown("---")
+    st.markdown('<div class="sb-gap"></div>', unsafe_allow_html=True)
 
-    st.markdown('<span class="sb-label">Time Horizon</span>', unsafe_allow_html=True)
-    time_horizon = st.radio(
-        "Time Horizon",
-        ["1 Year", "3 Years", "5 Years", "10 Years"],
-        index=2,
-        key="horizon",
-        label_visibility="collapsed",
-    )
-
-    st.markdown("---")
-
-    st.markdown('<span class="sb-label">Filter by Sector</span>', unsafe_allow_html=True)
-    selected_sectors = st.multiselect(
+    # ── Holdings — one search box for everything ──
+    st.markdown('<span class="sb-label">Build Your Portfolio</span>', unsafe_allow_html=True)
+    if selected_sectors := st.multiselect(
         "Filter by Sector",
         options=all_sectors,
         default=[],
-        placeholder="All sectors",
+        placeholder="Filter stocks by sector (optional)",
         label_visibility="collapsed",
-    )
-
-    st.markdown('<span class="sb-label">Stocks</span>', unsafe_allow_html=True)
-    st.caption("Search by ticker or company name.")
-    if selected_sectors:
-        pool = const_df[const_df["GICS Sector"].isin(selected_sectors)]
+    ):
+        stock_pool = const_df[const_df["GICS Sector"].isin(selected_sectors)]
     else:
-        pool = const_df
-    stock_options = pool["label"].tolist()
+        stock_pool = const_df
 
-    selected_stock_labels = st.multiselect(
-        "Stocks",
-        options=stock_options,
-        placeholder="Type to search…",
+    _options = stock_pool["label"].tolist()
+    if not etfs_df.empty:
+        _options += etfs_df["label"].tolist()
+    # Selected labels stay visible even if a sector filter would hide them
+    _options = sorted(set(_options) | set(st.session_state.get("holdings_sel", [])))
+
+    selected_labels = st.multiselect(
+        "Holdings",
+        options=_options,
+        placeholder="Search any stock or ETF…",
         max_selections=25,
-        key="stock_sel",
+        key="holdings_sel",
         label_visibility="collapsed",
     )
-
-    st.markdown('<span class="sb-label">ETFs &amp; Indices</span>', unsafe_allow_html=True)
-    st.caption("SPY is always the benchmark — add it here to also hold it.")
-    etf_options = etfs_df["label"].tolist() if not etfs_df.empty else []
-    selected_etf_labels = st.multiselect(
-        "ETFs",
-        options=etf_options,
-        placeholder="e.g. SPY, QQQ, GLD…",
-        key="etf_sel",
-        label_visibility="collapsed",
+    st.caption(
+        f"Type a ticker or company name — one box for all {len(const_df)} stocks "
+        f"and {len(etfs_df)} ETFs. SPY is always the benchmark; add it to also hold it."
     )
 
     # Symbols the user actually picked (their holdings)
-    user_picks = [extract_symbol(l) for l in selected_stock_labels]
-    user_picks += [extract_symbol(l) for l in selected_etf_labels]
-    user_picks = list(dict.fromkeys(user_picks))[:29]
+    user_picks = list(dict.fromkeys(extract_symbol(l) for l in selected_labels))[:29]
 
-    st.markdown("---")
+    st.markdown('<div class="sb-gap"></div>', unsafe_allow_html=True)
 
     # ── Weighting ──
     st.markdown('<span class="sb-label">Weighting</span>', unsafe_allow_html=True)
-    weight_mode = st.radio(
+    weight_mode = st.segmented_control(
         "Weighting",
         [EQUAL_MODE, CUSTOM_MODE],
         key="wmode",
         label_visibility="collapsed",
-    )
+    ) or EQUAL_MODE
 
     amounts = {}
     if weight_mode == CUSTOM_MODE and user_picks:
@@ -217,12 +208,21 @@ with st.sidebar:
     elif weight_mode == CUSTOM_MODE:
         st.caption("Pick stocks or ETFs above to enter dollar amounts.")
 
-    st.markdown("---")
+    st.markdown('<div class="sb-gap"></div>', unsafe_allow_html=True)
+
+    # ── Analysis settings ──
+    st.markdown('<span class="sb-label">Time Horizon</span>', unsafe_allow_html=True)
+    time_horizon = st.segmented_control(
+        "Time Horizon",
+        ["1Y", "3Y", "5Y", "10Y"],
+        key="horizon",
+        label_visibility="collapsed",
+    ) or "5Y"
 
     st.markdown('<span class="sb-label">Risk-Free Rate</span>', unsafe_allow_html=True)
     rfr_pct = st.slider(
         "Risk-Free Rate",
-        min_value=0.0, max_value=10.0, value=5.0,
+        min_value=0.0, max_value=10.0,
         step=0.5, format="%.1f%%",
         key="rfr_pct",
         label_visibility="collapsed",
@@ -232,7 +232,6 @@ with st.sidebar:
 
     portfolio_value = 0
     if weight_mode == EQUAL_MODE:
-        st.markdown("---")
         st.markdown('<span class="sb-label">Portfolio Value (Optional)</span>', unsafe_allow_html=True)
         portfolio_value = st.number_input(
             "Portfolio Value",
@@ -241,13 +240,13 @@ with st.sidebar:
         )
         st.caption("Enter your total investment to translate risk percentages into dollar amounts.")
 
-    st.markdown("---")
+    st.markdown('<div class="sb-gap"></div>', unsafe_allow_html=True)
     run_btn = st.button("Run Analysis", width="stretch", type="primary")
     st.caption("After running, your setup is saved in the page URL — copy it from the address bar to share or bookmark.")
 
 # ── Dates ─────────────────────────────────────────────────────────────────────
-_days   = {"1 Year": 365,  "3 Years": 1095, "5 Years": 1825, "10 Years": 3650}
-_buffer = {"1 Year": 60,   "3 Years": 120,  "5 Years": 150,  "10 Years": 200}
+_days   = {"1Y": 365, "3Y": 1095, "5Y": 1825, "10Y": 3650}
+_buffer = {"1Y": 60,  "3Y": 120,  "5Y": 150,  "10Y": 200}
 end_date   = datetime.date.today()
 start_date = end_date - datetime.timedelta(days=_days[time_horizon] + _buffer[time_horizon])
 
@@ -380,7 +379,7 @@ st.markdown(
     f'<div class="info-bar">'
     f"<b>Portfolio</b> &nbsp; {chips} <br>"
     f"<b>Period</b> &nbsp; {start_date} → {end_date} &nbsp;&nbsp;"
-    f"<b>Horizon</b> &nbsp; {time_horizon} &nbsp;&nbsp;"
+    f"<b>Horizon</b> &nbsp; {_HORIZON_DISPLAY[time_horizon]} &nbsp;&nbsp;"
     f"<b>Risk-free rate</b> &nbsp; {rfr * 100:.1f}% &nbsp;&nbsp;"
     f"<b>Weighting</b> &nbsp; {weighting_desc}"
     f"</div>",

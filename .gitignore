@@ -24,3 +24,6 @@ Thumbs.db
 
 # Local tool config
 .claude/
+
+# Local pre-change snapshots (with revert scripts)
+backups/
