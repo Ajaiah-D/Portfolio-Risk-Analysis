@@ -26,6 +26,7 @@ An interactive portfolio risk dashboard built with Streamlit, backed by a local 
 Massive.com API ──► fetch_data.py ──► store_data.py ──► SQLite (daily_prices, tickers_meta)
 yfinance        ──► backfill_yfinance.py ─────────────► SQLite (gap fill)
 yfinance        ──► refresh_prices.py ────────────────► SQLite (forward refresh)
+GitHub Actions  ──► refresh_prices.py (daily, Mon–Fri) ► cache-persisted SQLite + last_updated.json
 
 SQLite ──► data/helpers.py ──► metrics/ (core, optimize)
                                   │
@@ -67,6 +68,8 @@ Data is ingested once and refreshed forward on demand. The Streamlit app reads o
 **Dark mode CSS scoping workaround** — Streamlit popovers render in a separate stacking context where CSS custom properties don't resolve; dark mode injects a second hardcoded CSS block targeting popover elements.
 
 **Tested at three levels** — unit tests for the metrics engine (hand-checked values), analytic-solution tests for the optimizer, and end-to-end `streamlit.testing.AppTest` runs that execute the real app headlessly (empty state, example flow, URL prefill, custom amounts).
+
+**Automated refresh without committing the database** — the DB is gitignored because it's too large for GitHub (95MB+ and growing, close to GitHub's 100MB hard per-file limit). A daily GitHub Actions workflow persists it between runs via `actions/cache` instead of git, and refreshes it forward with `refresh_prices.py`. Only a small `data/last_updated.json` (timestamp, ticker count, date range, row count) gets committed — that's the freshness signal any health check reads, without ever touching a large binary in git history.
 
 ---
 
@@ -123,9 +126,33 @@ python -m pytest tests/
 
 ---
 
+## Automated Data Refresh (GitHub Actions)
+
+`.github/workflows/refresh_data.yml` runs `scripts/refresh_prices.py` automatically every weekday morning (11:00 UTC) and on manual dispatch. Since the price database is gitignored, the workflow never commits it — instead:
+
+1. The DB is restored from **GitHub Actions cache** (persists between runs, no git history bloat).
+2. `refresh_prices.py` fetches forward from each ticker's last known date.
+3. `scripts/write_last_updated.py` writes `data/last_updated.json` — a timestamp, ticker count, date range, and row count.
+4. The updated DB is saved back to cache; `last_updated.json` is committed **only if it changed**.
+5. A rolling backup of the DB is also uploaded to a GitHub Release (`data-seed` tag) — used only if the cache is ever empty (first run, or a cache eviction).
+
+**One-time setup:** the bootstrap fallback needs a starter DB uploaded once:
+
+```bash
+gh release create data-seed data/portfolio_data.db \
+  --title "Price data seed" \
+  --notes "Bootstrap fallback for the daily refresh workflow."
+```
+
+After that, the workflow is self-sufficient — no secrets beyond the default `GITHUB_TOKEN` are required.
+
+---
+
 ## Project Structure
 
 ```
+├── .github/workflows/
+│   └── refresh_data.yml        # Daily automated price refresh (see above)
 ├── streamlit_app/
 │   ├── Portfolio_Analyzer.py   # Orchestration: sidebar, session state, tabs
 │   ├── charts.py               # Plotly chart builders
@@ -139,7 +166,8 @@ python -m pytest tests/
 │   └── optimize.py             # Max-Sharpe / min-vol weight search
 ├── data/
 │   ├── helpers.py              # Parameterized SQLite query layer
-│   └── portfolio_data.db       # Local price database (git-ignored)
+│   ├── portfolio_data.db       # Local price database (git-ignored)
+│   └── last_updated.json       # Freshness metadata (git-tracked, small)
 ├── scripts/
 │   ├── fetch_data.py           # Massive.com API client (formerly Polygon.io)
 │   ├── store_data.py           # SQLite write functions
@@ -147,6 +175,7 @@ python -m pytest tests/
 │   ├── backfill_history.py     # Extends history via Massive.com (rate-limited)
 │   ├── backfill_yfinance.py    # Fills historical gaps via yfinance
 │   ├── refresh_prices.py       # Forward refresh to yesterday via yfinance
+│   ├── write_last_updated.py   # Writes data/last_updated.json freshness metadata
 │   ├── utils.py                # API key loading, rate-limit sleep
 │   └── .env                    # API key (git-ignored)
 ├── tests/
