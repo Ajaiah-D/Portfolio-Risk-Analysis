@@ -28,9 +28,9 @@ jobs:
   refresh:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.11"
 
@@ -42,7 +42,7 @@ jobs:
       # is unique per run so a fresh version is always saved; restore-keys
       # grabs the most recent existing entry regardless of exact key match.
       - name: Restore price database from cache
-        uses: actions/cache/restore@v4
+        uses: actions/cache/restore@v6
         with:
           path: ${{ env.DB_PATH }}
           key: sqlite-db-${{ github.run_id }}
@@ -77,7 +77,7 @@ jobs:
         run: python scripts/write_last_updated.py
 
       - name: Save updated database to cache
-        uses: actions/cache/save@v4
+        uses: actions/cache/save@v6
         with:
           path: ${{ env.DB_PATH }}
           key: sqlite-db-${{ github.run_id }}
