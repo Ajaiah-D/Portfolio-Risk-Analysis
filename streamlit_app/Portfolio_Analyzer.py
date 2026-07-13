@@ -1,6 +1,8 @@
 import datetime
+import os
 import sqlite3
 import sys
+import urllib.request
 
 import numpy as np
 import pandas as pd
@@ -19,6 +21,33 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded",
 )
+
+# ── Bootstrap the price database on hosted deploys ───────────────────────────
+# The DB is gitignored (95MB+, too large for GitHub), so a fresh Streamlit
+# Cloud container starts with no database at all. If it's missing, pull the
+# rolling seed backup that scripts/refresh_prices.py + GitHub Actions keeps
+# updated daily (see .github/workflows/refresh_data.yml). No-op locally where
+# the DB already exists.
+DB_PATH = "data/portfolio_data.db"
+DB_SEED_URL = (
+    "https://github.com/Ajaiah-D/Portfolio-Risk-Analysis/"
+    "releases/download/data-seed/portfolio_data.db"
+)
+
+
+def _ensure_database():
+    if os.path.exists(DB_PATH) and os.path.getsize(DB_PATH) > 0:
+        return
+    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+    with st.spinner("First-time setup — downloading price data (~95MB, one-time per session)…"):
+        try:
+            urllib.request.urlretrieve(DB_SEED_URL, DB_PATH)
+        except Exception as e:
+            st.error(f"Failed to download the price database: {e}")
+            st.stop()
+
+
+_ensure_database()
 
 # ── Session state defaults ────────────────────────────────────────────────────
 if "dark_mode" not in st.session_state:
