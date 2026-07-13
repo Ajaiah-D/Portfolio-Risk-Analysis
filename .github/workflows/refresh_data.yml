@@ -1,0 +1,103 @@
+name: Refresh Price Data
+
+# 11:00 UTC = 6/7am US Eastern, well after the prior trading day's close.
+# Mon-Fri only - markets are closed on weekends, so there's nothing to fetch.
+# workflow_dispatch lets you trigger a manual run any time (including weekends).
+on:
+  schedule:
+    - cron: "0 11 * * 1-5"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+# Avoid two refreshes stepping on each other if a manual run overlaps the
+# scheduled one; queue instead of cancelling so no partial DB state is lost.
+concurrency:
+  group: refresh-data
+  cancel-in-progress: false
+
+env:
+  DB_PATH: data/portfolio_data.db
+  # One-time bootstrap fallback if the Actions cache is ever empty (first run,
+  # or a cache eviction). See scripts/refresh_prices.py / README for how this
+  # release is seeded.
+  SEED_RELEASE_TAG: data-seed
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      # The DB is gitignored (too large for GitHub), so it's never committed.
+      # It's persisted between daily runs via Actions cache instead. The key
+      # is unique per run so a fresh version is always saved; restore-keys
+      # grabs the most recent existing entry regardless of exact key match.
+      - name: Restore price database from cache
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ env.DB_PATH }}
+          key: sqlite-db-${{ github.run_id }}
+          restore-keys: |
+            sqlite-db-
+
+      - name: Bootstrap database if no cache was found
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ -f "$DB_PATH" ]; then
+            echo "Using cached database ($(du -h "$DB_PATH" | cut -f1))."
+          else
+            echo "No cached database found - restoring from seed release '$SEED_RELEASE_TAG'..."
+            mkdir -p data
+            gh release download "$SEED_RELEASE_TAG" \
+              --pattern "portfolio_data.db" \
+              --output "$DB_PATH" \
+              --repo "${{ github.repository }}" \
+            || {
+              echo "::error::No cached database and no '$SEED_RELEASE_TAG' release found."
+              echo "::error::One-time setup required: upload a starter DB with"
+              echo "::error::  gh release create $SEED_RELEASE_TAG data/portfolio_data.db --title 'Price data seed' --notes 'Bootstrap fallback for the daily refresh workflow.'"
+              exit 1
+            }
+          fi
+
+      - name: Refresh prices forward
+        run: python scripts/refresh_prices.py
+
+      - name: Write freshness metadata
+        run: python scripts/write_last_updated.py
+
+      - name: Save updated database to cache
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ env.DB_PATH }}
+          key: sqlite-db-${{ github.run_id }}
+
+      # Rolling backup so the bootstrap fallback above never goes too stale.
+      - name: Update seed release with latest database
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload "$SEED_RELEASE_TAG" "$DB_PATH" \
+            --clobber --repo "${{ github.repository }}"
+
+      - name: Commit freshness metadata if it changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/last_updated.json
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "chore: update data freshness metadata [skip ci]"
+            git push
+          fi
