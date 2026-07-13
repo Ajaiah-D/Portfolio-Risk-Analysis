@@ -161,6 +161,12 @@ header[data-testid="stHeader"] {{
 [data-testid="stSidebar"] {{
     background-color: var(--bg2) !important;
     border-right: 1px solid var(--border);
+    /* Streamlit's default drag-resized width is narrower than the Weighting
+       and Time Horizon segmented controls need, so they wrap onto a second
+       row instead of showing as one row of pills. min-width sets a floor
+       without disabling the drag handle — users can still widen it further,
+       just never narrower than this. */
+    min-width: 380px !important;
 }}
 
 /* ── Tabs ── */
