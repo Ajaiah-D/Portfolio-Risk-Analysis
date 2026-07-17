@@ -1,4 +1,5 @@
 import datetime
+import hashlib
 import os
 import sqlite3
 import sys
@@ -11,7 +12,7 @@ import streamlit as st
 sys.path.insert(0, ".")
 from data import helpers
 from metrics import core, optimize
-from streamlit_app import charts, insights, interpret, style
+from streamlit_app import allocation, charts, insights, interpret, style
 from streamlit_app.interpret import metric_card_html, style_asset_table, corr_cell_css
 
 # ── Page config ───────────────────────────────────────────────────────────────
@@ -147,6 +148,14 @@ def _load_example():
     st.session_state.analysis_run = True
 
 
+def _reset_amounts():
+    """Clear manual edits so custom amounts re-balance from scratch."""
+    st.session_state["amt_locked"] = []
+    st.session_state["amounts"] = {}
+    st.session_state["amt_budget_prev"] = None
+    st.session_state["amt_nonce"] = st.session_state.get("amt_nonce", 0) + 1
+
+
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 # Session defaults set before widgets so preset values (URL prefill, example
 # button) never conflict with widget default arguments.
@@ -209,12 +218,47 @@ with st.sidebar:
         label_visibility="collapsed",
     ) or EQUAL_MODE
 
+    st.markdown('<span class="sb-label">Portfolio Value (Optional)</span>', unsafe_allow_html=True)
+    portfolio_value = st.number_input(
+        "Portfolio Value",
+        min_value=0, max_value=100_000_000, value=0, step=1000,
+        format="%d", key="pv", label_visibility="collapsed",
+    )
+    if weight_mode == CUSTOM_MODE:
+        st.caption("Set a total and the amounts below auto-balance to it — edit one holding and the rest adjust. Leave 0 to type free amounts.")
+    else:
+        st.caption("Enter your total investment to translate risk percentages into dollar amounts.")
+
     amounts = {}
     if weight_mode == CUSTOM_MODE and user_picks:
-        _saved = st.session_state.get("amounts", {})
+        _budget = float(portfolio_value or 0)
+        _saved = {t: float(v) for t, v in st.session_state.get("amounts", {}).items()
+                  if t in user_picks}
+        _locked = [t for t in st.session_state.get("amt_locked", []) if t in user_picks]
+
+        # Warning queued by the previous run (a rejected edit snapped back)
+        _queued = st.session_state.pop("amt_warning", None)
+        if _queued:
+            st.warning(_queued, icon="⚠️")
+
+        if _budget > 0:
+            if sum(_saved.get(t, 0.0) for t in _locked) > _budget + 0.005:
+                # Budget was lowered below what's already locked — start fresh
+                _locked = []
+                st.session_state["amt_locked"] = []
+            if (st.session_state.get("amt_budget_prev") != _budget
+                    or any(t not in _saved for t in user_picks)):
+                _saved = allocation.spread(_budget, _locked, _saved, user_picks)
+        else:
+            for t in user_picks:
+                _saved.setdefault(t, 1000.0)
+        st.session_state["amt_budget_prev"] = _budget
+        st.session_state["amounts"] = _saved
+
+        _nonce = st.session_state.get("amt_nonce", 0)
         _rows = pd.DataFrame(
             {"Ticker": user_picks,
-             "Amount ($)": [float(_saved.get(t, 1000.0)) for t in user_picks]}
+             "Amount ($)": [float(_saved[t]) for t in user_picks]}
         )
         _edited = st.data_editor(
             _rows,
@@ -222,18 +266,54 @@ with st.sidebar:
             disabled=["Ticker"],
             column_config={
                 "Amount ($)": st.column_config.NumberColumn(
-                    "Amount ($)", min_value=0.0, step=100.0, format="$%d"
+                    "Amount ($)", min_value=0.0, step=1.0, format="$%.2f"
                 ),
             },
-            key=f"amt_editor_{'_'.join(user_picks)}",
+            key=f"amt_editor_{_nonce}_{int(_budget)}_{'_'.join(user_picks)}",
             width="stretch",
         )
-        amounts = {
+        _entered = {
             str(r["Ticker"]): float(r["Amount ($)"] or 0.0)
             for _, r in _edited.iterrows()
         }
-        st.session_state["amounts"] = {**_saved, **amounts}
-        st.caption(f"Total: ${sum(amounts.values()):,.0f} — metrics use these dollar weights.")
+        _edits = {t: v for t, v in _entered.items()
+                  if abs(v - _saved.get(t, 0.0)) > 0.005}
+
+        if _edits and _budget > 0:
+            _ok, _new_amounts, _new_locked, _over = allocation.apply_edit(
+                _budget, _locked, _saved, user_picks, _edits
+            )
+            if _ok:
+                st.session_state["amounts"] = _new_amounts
+                st.session_state["amt_locked"] = _new_locked
+            else:
+                st.session_state["amt_warning"] = (
+                    f"That change puts your allocations ${_over:,.2f} over the "
+                    f"${_budget:,.0f} portfolio value. Reduce another holding first."
+                )
+            st.session_state["amt_nonce"] = _nonce + 1
+            st.rerun()
+        elif _edits:
+            st.session_state["amounts"] = {**_saved, **_edits}
+
+        amounts = {t: float(st.session_state["amounts"].get(t, 0.0)) for t in user_picks}
+        _total = sum(amounts.values())
+        if _budget > 0:
+            _mismatch = allocation.total_mismatch(
+                _budget, st.session_state.get("amt_locked", []), amounts, user_picks
+            )
+            if _mismatch:
+                st.warning(
+                    f"Every amount is set manually, so nothing is left to auto-balance — "
+                    f"the total is ${_total:,.2f}, "
+                    f"${abs(_mismatch):,.2f} {'over' if _mismatch > 0 else 'under'} your portfolio value.",
+                    icon="⚠️",
+                )
+            else:
+                st.caption(f"Total ${_total:,.2f} of ${_budget:,.0f} — your edits are kept, the rest auto-balance.")
+            st.button("Rebalance equally", on_click=_reset_amounts, width="stretch")
+        else:
+            st.caption(f"Total: ${_total:,.2f} — metrics use these dollar weights.")
     elif weight_mode == CUSTOM_MODE:
         st.caption("Pick stocks or ETFs above to enter dollar amounts.")
 
@@ -258,16 +338,6 @@ with st.sidebar:
     )
     rfr = rfr_pct / 100
     st.caption(f"Currently {rfr_pct:.1f}% — this is the 'safe' return (e.g. T-bill) used to measure whether your portfolio rewards you enough for the extra risk taken.")
-
-    portfolio_value = 0
-    if weight_mode == EQUAL_MODE:
-        st.markdown('<span class="sb-label">Portfolio Value (Optional)</span>', unsafe_allow_html=True)
-        portfolio_value = st.number_input(
-            "Portfolio Value",
-            min_value=0, max_value=100_000_000, value=0, step=1000,
-            format="%d", key="pv", label_visibility="collapsed",
-        )
-        st.caption("Enter your total investment to translate risk percentages into dollar amounts.")
 
     st.markdown('<div class="sb-gap"></div>', unsafe_allow_html=True)
     run_btn = st.button("Run Analysis", width="stretch", type="primary")
@@ -385,6 +455,15 @@ with st.spinner("Fetching data and computing metrics…"):
         div_score=div_score,
         opt=opt,
     )
+
+# ── Chart remount signature ──────────────────────────────────────────────────
+# Plotly charts need a key (two identical charts would collide on auto-IDs),
+# but a keyed chart can keep showing a stale figure when its data changes.
+# Deriving the key from the inputs forces a clean remount on every change.
+_data_sig = hashlib.md5(
+    f"{time_horizon}|{rfr_pct}|{','.join(sorted(held))}|{portfolio_value}"
+    f"|{weighting_desc}|{sorted(weights_map.items())}|{dark}".encode()
+).hexdigest()[:10]
 
 # ── Persist setup in the URL (share / bookmark) ───────────────────────────────
 _qp_out = {"t": ",".join(held), "h": _HORIZON_NUMS[time_horizon], "r": f"{rfr_pct:g}"}
@@ -507,7 +586,7 @@ with tab_overview:
 with tab_perf:
     _section("Performance", "Cumulative Returns",
              "Growth of the period. The bold line is your weighted portfolio, the dotted line is SPY. Hover to compare values.")
-    st.plotly_chart(charts.build_cumulative_chart(df, weights_map, dark=dark), width="stretch", key="ch_cum")
+    st.plotly_chart(charts.build_cumulative_chart(df, weights_map, dark=dark), width="stretch", key=f"ch_cum_{_data_sig}")
 
     _section("Breakdown", "Asset Metrics",
              "Per-holding risk and return over the selected period. SPY is the benchmark — Beta, Sharpe, and Sortino are measured relative to it. "
@@ -516,24 +595,24 @@ with tab_perf:
 
     _section("Composition", "Sector Exposure",
              "Where your money sits across GICS sectors, using your current weights. ETFs and funds without a sector are grouped as Other / ETF.")
-    st.plotly_chart(charts.build_sector_chart(df, weights_map, dark=dark), width="stretch", key="ch_sector_perf")
+    st.plotly_chart(charts.build_sector_chart(df, weights_map, dark=dark), width="stretch", key=f"ch_sector_perf_{_data_sig}")
 
 # ═══ RISK ═════════════════════════════════════════════════════════════════════
 with tab_risk:
     _section("Drawdowns", "Underwater Chart",
              "How far below its previous peak the portfolio was at every point in time. "
              "Depth shows how bad losses got; width shows how long recovery took.")
-    st.plotly_chart(charts.build_underwater_chart(port_r_series, dark=dark), width="stretch", key="ch_underwater")
+    st.plotly_chart(charts.build_underwater_chart(port_r_series, dark=dark), width="stretch", key=f"ch_underwater_{_data_sig}")
 
     _rc1, _rc2 = st.columns(2)
     with _rc1:
         _section("Volatility Over Time", "Rolling Volatility",
                  "Risk isn't constant — this shows when your portfolio was calm and when it was turbulent, vs SPY.")
-        st.plotly_chart(charts.build_rolling_vol_chart(port_r_series, bench_r, dark=dark), width="stretch", key="ch_rvol")
+        st.plotly_chart(charts.build_rolling_vol_chart(port_r_series, bench_r, dark=dark), width="stretch", key=f"ch_rvol_{_data_sig}")
     with _rc2:
         _section("Market Sensitivity", "Rolling Beta",
                  "How strongly your portfolio tracked the market over time. Above 1 = amplifies market moves; below 1 = defensive.")
-        st.plotly_chart(charts.build_rolling_beta_chart(port_r_series, bench_r, dark=dark), width="stretch", key="ch_rbeta")
+        st.plotly_chart(charts.build_rolling_beta_chart(port_r_series, bench_r, dark=dark), width="stretch", key=f"ch_rbeta_{_data_sig}")
 
 # ═══ DIVERSIFICATION ══════════════════════════════════════════════════════════
 with tab_div:
@@ -550,7 +629,7 @@ with tab_div:
             unsafe_allow_html=True,
         )
     with _dc2:
-        st.plotly_chart(charts.build_sector_chart(df, weights_map, dark=dark), width="stretch", key="ch_sector_div")
+        st.plotly_chart(charts.build_sector_chart(df, weights_map, dark=dark), width="stretch", key=f"ch_sector_div_{_data_sig}")
 
     _section("Correlations", "Correlation Matrix",
              "How closely each holding moves with the others. "
@@ -611,7 +690,7 @@ with tab_whatif:
         }
     frontier_fig = charts.build_frontier_chart(df, weights_map, rfr=rfr, dark=dark, opt_points=_opt_points)
     if frontier_fig:
-        st.plotly_chart(frontier_fig, width="stretch", key="ch_frontier")
+        st.plotly_chart(frontier_fig, width="stretch", key=f"ch_frontier_{_data_sig}")
     else:
         st.info("Select at least 2 holdings to see the efficient frontier.", icon="ℹ️")
 
@@ -644,6 +723,7 @@ with tab_whatif:
     _total_w = sum(_raw_w.values())
     if _total_w > 0:
         _slider_weights = {t: _raw_w.get(t, 0.0) / _total_w for t in held}
+        _whatif_sig = hashlib.md5(str(sorted(_slider_weights.items())).encode()).hexdigest()[:8]
         _slider_full = {**{t: 0.0 for t in actual}, **_slider_weights}
         _custom_port_dict, _ = core.compute_portfolio_metrics(
             df, _slider_full, benchmark_ticker="SPY", risk_free_rate=rfr
@@ -670,7 +750,7 @@ with tab_whatif:
 
         st.plotly_chart(
             charts.build_sector_chart(df, _slider_weights, dark=dark),
-            width="stretch", key="ch_sector_whatif",
+            width="stretch", key=f"ch_sector_whatif_{_data_sig}_{_whatif_sig}",
         )
 
 # ═══ PLANNING ═════════════════════════════════════════════════════════════════
@@ -702,7 +782,7 @@ with tab_plan:
         _mc_fig, _prob, _med, _p10, _p90 = charts.build_monte_carlo(
             port_r_series, portfolio_value, _target_value, _mc_years, dark=dark
         )
-        st.plotly_chart(_mc_fig, width="stretch", key="ch_mc")
+        st.plotly_chart(_mc_fig, width="stretch", key=f"ch_mc_{_data_sig}_{_mc_years}_{int(_target_value)}")
 
         _prob_cls = "bg" if _prob >= 0.6 else ("by" if _prob >= 0.35 else "br")
         _prob_badge = f"<span class='mcard-badge {_prob_cls}'>{_prob*100:.0f}% probability</span>"

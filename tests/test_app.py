@@ -90,3 +90,46 @@ def test_custom_amounts_mode():
     # custom mode derives portfolio value -> Planning tab should have MC inputs
     all_md = " ".join(str(m.value) for m in at.markdown)
     assert "Dollar Context" in all_md
+
+
+def _planning_info_bar(at):
+    """The Monte Carlo results info bar ('% probability of reaching ...')."""
+    return next(str(m.value) for m in at.markdown if "of reaching" in str(m.value))
+
+
+def test_planning_recalculates_on_input_change():
+    at = make_app()
+    at.query_params["t"] = "AAPL,MSFT,JNJ"
+    at.query_params["v"] = "10000"
+    at.run()
+    assert not at.exception
+    before = _planning_info_bar(at)
+
+    # Change the Monte Carlo years slider -> results must recompute
+    years = next(s for s in at.slider if "years" in s.label.lower())
+    years.set_value(25).run()
+    assert not at.exception
+    after_years = _planning_info_bar(at)
+    assert after_years != before, "MC results did not change when years changed"
+
+    # Change the sidebar time horizon -> return series changes -> recompute
+    at.session_state["horizon"] = "1Y"
+    at.run()
+    assert not at.exception
+    after_horizon = _planning_info_bar(at)
+    assert after_horizon != after_years, "MC results did not change when horizon changed"
+
+
+def test_budget_mode_equal_start(monkeypatch=None):
+    # Custom mode + portfolio value: amounts should start as an equal split
+    at = make_app()
+    at.query_params["t"] = "AAPL,MSFT,JNJ,XOM"
+    at.run()
+    at.session_state["wmode"] = "Custom amounts ($)"
+    at.session_state["pv"] = 5
+    at.run()
+    assert not at.exception
+    amounts = at.session_state["amounts"]
+    assert set(amounts) == {"AAPL", "MSFT", "JNJ", "XOM"}
+    assert sum(amounts.values()) == pytest.approx(5.0, abs=0.01)
+    assert all(abs(v - 1.25) < 0.011 for v in amounts.values())

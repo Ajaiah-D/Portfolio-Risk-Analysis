@@ -7,7 +7,7 @@ An interactive portfolio risk dashboard built with Streamlit, backed by a local 
 ## What It Does
 
 - Select up to 25 S&P 500 stocks and/or ETFs; SPY is always included as the market benchmark (and can also be held as a position)
-- **Analyze your real portfolio**: enter the dollar amount you hold in each position, or use equal weighting to explore
+- **Analyze your real portfolio**: enter the dollar amount you hold in each position, or use equal weighting to explore. Set a total portfolio value and amounts auto-balance to it — edit one holding and the rest adjust, with a warning if an edit would exceed the total
 - Filter the stock universe by GICS sector; choose a 1–10 year horizon and adjustable risk-free rate
 - **Overview tab** — scorecard vs SPY (return, volatility, Sharpe, max drawdown), seven interpreted metric cards, and automatic plain-English insights (correlation clusters, sector concentration, risk drivers, worst month, improvement opportunities)
 - **Performance tab** — cumulative returns vs SPY, per-asset metrics table, sector exposure
