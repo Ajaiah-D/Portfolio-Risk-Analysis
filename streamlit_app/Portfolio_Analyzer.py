@@ -40,7 +40,7 @@ def _ensure_database():
     if os.path.exists(DB_PATH) and os.path.getsize(DB_PATH) > 0:
         return
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
-    with st.spinner("First-time setup — downloading price data (~95MB, one-time per session)…"):
+    with st.spinner("First-time setup: downloading price data (~95MB, one time per session)…"):
         try:
             urllib.request.urlretrieve(DB_SEED_URL, DB_PATH)
         except Exception as e:
@@ -200,8 +200,8 @@ with st.sidebar:
         label_visibility="collapsed",
     )
     st.caption(
-        f"Type a ticker or company name — one box for all {len(const_df)} stocks "
-        f"and {len(etfs_df)} ETFs. SPY is always the benchmark; add it to also hold it."
+        f"Type a ticker or company name. One box covers all {len(const_df)} stocks "
+        f"and {len(etfs_df)} ETFs. SPY is always the benchmark. Add it if you want to hold it too."
     )
 
     # Symbols the user actually picked (their holdings)
@@ -225,7 +225,7 @@ with st.sidebar:
         format="%d", key="pv", label_visibility="collapsed",
     )
     if weight_mode == CUSTOM_MODE:
-        st.caption("Set a total and the amounts below auto-balance to it — edit one holding and the rest adjust. Leave 0 to type free amounts.")
+        st.caption("Set a total and the amounts below balance to it automatically. Edit one holding and the rest adjust. Leave it at 0 to type any amounts.")
     else:
         st.caption("Enter your total investment to translate risk percentages into dollar amounts.")
 
@@ -304,16 +304,16 @@ with st.sidebar:
             )
             if _mismatch:
                 st.warning(
-                    f"Every amount is set manually, so nothing is left to auto-balance — "
-                    f"the total is ${_total:,.2f}, "
+                    f"Every amount is set manually, so nothing is left to auto-balance. "
+                    f"The total is ${_total:,.2f}, "
                     f"${abs(_mismatch):,.2f} {'over' if _mismatch > 0 else 'under'} your portfolio value.",
                     icon="⚠️",
                 )
             else:
-                st.caption(f"Total ${_total:,.2f} of ${_budget:,.0f} — your edits are kept, the rest auto-balance.")
+                st.caption(f"Total ${_total:,.2f} of ${_budget:,.0f}. Your edits are kept and the rest auto-balance.")
             st.button("Rebalance equally", on_click=_reset_amounts, width="stretch")
         else:
-            st.caption(f"Total: ${_total:,.2f} — metrics use these dollar weights.")
+            st.caption(f"Total: ${_total:,.2f}. Metrics use these dollar weights.")
     elif weight_mode == CUSTOM_MODE:
         st.caption("Pick stocks or ETFs above to enter dollar amounts.")
 
@@ -337,11 +337,11 @@ with st.sidebar:
         label_visibility="collapsed",
     )
     rfr = rfr_pct / 100
-    st.caption(f"Currently {rfr_pct:.1f}% — this is the 'safe' return (e.g. T-bill) used to measure whether your portfolio rewards you enough for the extra risk taken.")
+    st.caption(f"Currently {rfr_pct:.1f}%. This is the 'safe' return you could get from a T-bill. The metrics use it to check the extra risk is actually paying you.")
 
     st.markdown('<div class="sb-gap"></div>', unsafe_allow_html=True)
     run_btn = st.button("Run Analysis", width="stretch", type="primary")
-    st.caption("After running, your setup is saved in the page URL — copy it from the address bar to share or bookmark.")
+    st.caption("After running, your setup is saved in the page URL. Copy it from the address bar to share or bookmark.")
 
 # ── Dates ─────────────────────────────────────────────────────────────────────
 _days   = {"1Y": 365, "3Y": 1095, "5Y": 1825, "10Y": 3650}
@@ -357,7 +357,7 @@ st.markdown(
 st.markdown(
     '<p class="hero-sub">Understand what your portfolio actually does: how much risk you\'re taking, '
     "where it comes from, and what the same holdings could look like with different weights. "
-    "Every metric is explained in plain English — see the Glossary page for definitions.</p>",
+    "Every metric is explained in plain English, and the Glossary page has full definitions.</p>",
     unsafe_allow_html=True,
 )
 
@@ -369,7 +369,7 @@ if not st.session_state.get("analysis_run", False):
     _steps = st.columns(3)
     _step_content = [
         ("1", "Pick your holdings",
-         "Choose up to 25 stocks and ETFs in the sidebar — search by ticker or company name. SPY is always included as the market benchmark."),
+         "Choose up to 25 stocks and ETFs in the sidebar. Search by ticker or company name. SPY is always included as the market benchmark."),
         ("2", "Set your amounts",
          "Use equal weighting to explore, or switch to Custom amounts and enter the dollars you actually hold in each position."),
         ("3", "Run the analysis",
@@ -550,7 +550,7 @@ with tab_overview:
 
     if insight_items:
         _section("Insights", "What Stands Out",
-                 "Automatic findings from your portfolio's data — concentration, correlation, history, and improvement opportunities.")
+                 "Automatic findings from your portfolio's data: concentration, correlation, history, and things worth improving.")
         for item in insight_items:
             st.markdown(insights.insight_html(item), unsafe_allow_html=True)
 
@@ -572,10 +572,10 @@ with tab_overview:
             _recovery_months = (np.log(1 + _recovery_needed) / np.log(1 + _ann_ret)) * 12
             _recovery_txt = f"At the portfolio's historical average annual return of <b>{_ann_ret*100:.1f}%</b>, estimated recovery is <b>~{_recovery_months:.0f} months</b>."
         else:
-            _recovery_txt = "Recovery time cannot be estimated — the portfolio's historical average annual return is negative or zero."
+            _recovery_txt = "Recovery time cannot be estimated because the portfolio's historical average annual return is negative or zero."
         st.markdown(
             f'<div class="info-bar">'
-            f"<b>Dollar Context</b> &nbsp; Based on a <b>${portfolio_value:,.0f}</b> portfolio &nbsp;&mdash;&nbsp; "
+            f"<b>Dollar Context</b> &nbsp; Based on a <b>${portfolio_value:,.0f}</b> portfolio: "
             f"the max drawdown of <b>{_max_dd*100:.1f}%</b> represents a peak loss of <b>${_dollar_loss:,.0f}</b>. &nbsp;"
             f"{_recovery_txt}"
             f"</div>",
@@ -589,7 +589,7 @@ with tab_perf:
     st.plotly_chart(charts.build_cumulative_chart(df, weights_map, dark=dark), width="stretch", key=f"ch_cum_{_data_sig}")
 
     _section("Breakdown", "Asset Metrics",
-             "Per-holding risk and return over the selected period. SPY is the benchmark — Beta, Sharpe, and Sortino are measured relative to it. "
+             "Per-holding risk and return over the selected period. SPY is the benchmark, so Beta, Sharpe, and Sortino are measured against it. "
              "Green = favorable &nbsp;·&nbsp; Amber = neutral &nbsp;·&nbsp; Rose = elevated risk.")
     st.dataframe(style_asset_table(asset_df), width="stretch")
 
@@ -607,7 +607,7 @@ with tab_risk:
     _rc1, _rc2 = st.columns(2)
     with _rc1:
         _section("Volatility Over Time", "Rolling Volatility",
-                 "Risk isn't constant — this shows when your portfolio was calm and when it was turbulent, vs SPY.")
+                 "Risk isn't constant. This shows when your portfolio was calm and when it was rough, next to SPY.")
         st.plotly_chart(charts.build_rolling_vol_chart(port_r_series, bench_r, dark=dark), width="stretch", key=f"ch_rvol_{_data_sig}")
     with _rc2:
         _section("Market Sensitivity", "Rolling Beta",
@@ -646,7 +646,7 @@ with tab_whatif:
         _section("Optimizer", "What the Same Holdings Could Do",
                  "Two reference allocations found from your holdings' history: the mix that maximised risk-adjusted return (Max Sharpe), "
                  "and the mix that minimised volatility (Min Volatility). "
-                 "<b>These describe the past, not the future</b> — treat them as a study aid, not advice.")
+                 "<b>These describe the past, not the future.</b> Treat them as a study aid, not advice.")
 
         _oc = st.columns(3)
         _opt_rows = [
@@ -681,7 +681,7 @@ with tab_whatif:
     _section("Risk vs. Return", "Efficient Frontier",
              "Each dot is one of 2,500 randomly weighted combinations of your holdings, coloured by Sharpe ratio (pink = higher). "
              "The star is your portfolio; the green and violet markers are the optimizer's reference mixes. "
-             "Portfolios toward the <b>upper-left</b> are best — higher return for less risk.")
+             "Portfolios toward the <b>upper-left</b> are best: higher return for less risk.")
     _opt_points = None
     if opt is not None:
         _opt_points = {
@@ -697,7 +697,7 @@ with tab_whatif:
     # ── What-if sliders ──
     _section("What-If", "Adjust Portfolio Weights",
              "Drag the sliders to try different allocations. Metrics and sector breakdown update instantly. "
-             "Weights are normalised automatically — the total always equals 100%.")
+             "Weights are normalised automatically, so the total always equals 100%.")
 
     def _apply_slider_weights(wmap):
         for t in held:
@@ -757,7 +757,7 @@ with tab_whatif:
 with tab_plan:
     _section("Planning", "Monte Carlo Simulation",
              "Simulates 1,000 possible futures for your portfolio based on its historical daily return and volatility. "
-             "Useful for understanding the range of outcomes — not a prediction. "
+             "It shows a range of outcomes, not a prediction. "
              "<b>Assumes normally distributed returns</b> based on past data, which underestimates extreme events.")
 
     if not (portfolio_value and portfolio_value > 0):
@@ -788,7 +788,7 @@ with tab_plan:
         _prob_badge = f"<span class='mcard-badge {_prob_cls}'>{_prob*100:.0f}% probability</span>"
         st.markdown(
             f'<div class="info-bar">'
-            f"{_prob_badge} &nbsp; of reaching <b>${_target_value:,.0f}</b> within <b>{_mc_years} years</b> &nbsp;&mdash;&nbsp; "
+            f"{_prob_badge} &nbsp; of reaching <b>${_target_value:,.0f}</b> within <b>{_mc_years} years</b>. &nbsp; "
             f"Median outcome: <b>${_med:,.0f}</b> &nbsp;·&nbsp; "
             f"10th %ile: <b>${_p10:,.0f}</b> &nbsp;·&nbsp; "
             f"90th %ile: <b>${_p90:,.0f}</b>"

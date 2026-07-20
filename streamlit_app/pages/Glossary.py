@@ -1,7 +1,7 @@
 import streamlit as st
 
 st.set_page_config(
-    page_title="Glossary — Portfolio Risk Analysis",
+    page_title="Glossary | Portfolio Risk Analysis",
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -155,7 +155,7 @@ card(
 card(
     "Portfolio",
     "Basic",
-    "Your collection of investments — the group of stocks and ETFs you're analysing together. "
+    "Your collection of investments, meaning the group of stocks and ETFs you're analysing together. "
     "A portfolio lets you spread risk across many companies rather than putting everything into one.",
     "A portfolio of AAPL, MSFT, and AMZN means you hold shares in all three."
 )
@@ -176,7 +176,7 @@ card(
 card(
     "Benchmark (SPY)",
     "Basic",
-    "A reference point to compare your portfolio against. This tool always uses SPY — the S&P 500 ETF — "
+    "A reference point to compare your portfolio against. This tool always uses SPY, the S&P 500 ETF, "
     "as the benchmark. If your portfolio earns more than SPY with less risk, it's performing well. "
     "If it earns less, you'd have been better off just buying SPY.",
     "SPY returned 25% last year. If your portfolio returned 18%, you underperformed the benchmark."
@@ -193,8 +193,8 @@ card(
     "Equal Weighting",
     "Basic",
     "Divides your money evenly across every holding. "
-    "If you pick 5 stocks, each gets 20% of the total. This is the simplest approach — "
-    "it doesn't try to predict which stock will do best. It's the tool's default mode.",
+    "If you pick 5 stocks, each gets 20% of the total. This is the simplest approach. "
+    "It doesn't try to predict which stock will do best. It's the tool's default mode.",
 )
 card(
     "Custom Weighting",
@@ -213,7 +213,7 @@ st.markdown('<hr class="section-rule"/>', unsafe_allow_html=True)
 card(
     "Volatility",
     "Risk",
-    "How much a stock's price jumps around day to day. High volatility means big swings — "
+    "How much a stock's price jumps around day to day. High volatility means big swings: "
     "the price might rise or fall sharply in a short time. Low volatility means the price moves more steadily. "
     "Volatility is measured by standard deviation of daily returns.",
     "A stock that swings ±5% per day is far more volatile than one that moves ±0.5% per day."
@@ -221,7 +221,7 @@ card(
 card(
     "Risk-Free Rate",
     "Risk",
-    "The return you could earn without taking any risk — typically the interest rate on short-term US government bonds (T-bills). "
+    "The return you could earn without taking any risk, typically the interest rate on short-term US government bonds (T-bills). "
     "It's used as a baseline: any investment that takes on risk should ideally beat this rate, otherwise why bother?",
     "If T-bills pay 5% and your portfolio earns 4%, you'd have been better off with no risk at all."
 )
@@ -236,7 +236,7 @@ card(
 card(
     "Value at Risk (VaR, 5%)",
     "Risk",
-    "On your worst days — specifically the bottom 5% of all trading days — how much would you typically lose? "
+    "On your worst days, meaning the bottom 5% of all trading days, how much would you typically lose? "
     "VaR gives you a threshold: 95% of days, your loss should be smaller than this number. "
     "It's based purely on past returns, so it's only as reliable as history.",
     "A VaR of −2% means on your worst days, you'd expect to lose about 2% or more."
@@ -261,7 +261,7 @@ card(
     "Rolling Volatility",
     "Risk",
     "Volatility measured over a sliding window (about 3 months) instead of the whole period. "
-    "It shows <i>when</i> your portfolio was calm and when it was turbulent — "
+    "It shows <i>when</i> your portfolio was calm and when it was turbulent. "
     "a single overall number can hide the fact that most of the risk happened in one short stretch.",
 )
 
@@ -277,12 +277,12 @@ card(
     "A higher Sharpe ratio means you're being better rewarded for the risk. "
     "It uses total volatility (all price swings, up and down) in the calculation. "
     "Above 1.0 is generally considered good; above 2.0 is exceptional.",
-    "A Sharpe of 1.5 means you earned 1.5 units of return for every unit of risk — a solid result."
+    "A Sharpe of 1.5 means you earned 1.5 units of return for every unit of risk. A solid result."
 )
 card(
     "Sortino Ratio",
     "Performance",
-    "Similar to the Sharpe ratio, but it only penalises downward price swings — not upward ones. "
+    "Similar to the Sharpe ratio, but it only penalises downward price swings, not upward ones. "
     "The logic is that big gains aren't really 'risk', so why count them against you? "
     "Sortino tends to paint a more favourable picture than Sharpe for investments that occasionally spike upward.",
     "A stock that often surges but rarely crashes will score better on Sortino than Sharpe."
@@ -322,10 +322,10 @@ card(
     "Chart",
     "A scatter plot showing 2,500 randomly weighted versions of your portfolio, each dot representing a "
     "different way to split your money across your chosen stocks. "
-    "Dots toward the upper-left are best — higher return for lower risk. "
+    "Dots toward the upper-left are best: higher return for lower risk. "
     "The star shows where your current weights sit in comparison; the marked points show the "
     "Max Sharpe and Min Volatility reference mixes. "
-    "All of it describes the past, not the future — treat it as a study aid, not a recommendation.",
+    "All of it describes the past, not the future. Treat it as a study aid, not a recommendation.",
 )
 card(
     "Max Sharpe / Min Volatility",
@@ -333,14 +333,14 @@ card(
     "Two reference allocations the tool finds from your holdings' history: "
     "the weighting that would have delivered the best risk-adjusted return (Max Sharpe), and the weighting "
     "that would have been the calmest ride (Min Volatility). "
-    "They show what the <i>same holdings</i> could look like with different weights — "
+    "They show what the <i>same holdings</i> could look like with different weights, "
     "but past-optimal weights are not guaranteed to be future-optimal.",
 )
 card(
     "Monte Carlo Simulation",
     "Chart",
     "Simulates a thousand possible futures for your portfolio by repeatedly rolling dice weighted by its "
-    "historical average return and volatility. The result is a <i>range</i> of outcomes — median, optimistic, pessimistic — "
+    "historical average return and volatility. The result is a <i>range</i> of outcomes (median, optimistic, pessimistic) "
     "and the probability of reaching a target value. It assumes returns are normally distributed, "
     "which understates extreme events, so treat the tails with skepticism.",
     "'65% probability of reaching $50,000 in 10 years' means: in 650 of the 1,000 simulated futures, you got there."
@@ -352,10 +352,10 @@ card(
     "A value near 1.0 means they tend to rise and fall at the same time. "
     "A value near 0 means they move independently. "
     "A negative value means they tend to move in opposite directions. "
-    "Lower correlation between your holdings generally means better diversification — "
+    "Lower correlation between your holdings generally means better diversification: "
     "if one stock falls, the others aren't as likely to fall with it.",
-    "AAPL and MSFT might have a correlation of 0.85 — they tend to move together. "
-    "Gold (GLD) and tech stocks might have a correlation near 0 — they move independently."
+    "AAPL and MSFT might have a correlation of 0.85, so they tend to move together. "
+    "Gold (GLD) and tech stocks might have a correlation near 0, moving independently of each other."
 )
 card(
     "Diversification",
