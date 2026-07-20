@@ -300,19 +300,31 @@ header[data-testid="stHeader"] {{
     border-radius: 9px !important;
 }}
 
-/* ── Segmented controls (weighting, time horizon) ── */
-[data-testid="stSegmentedControl"] button {{
+/* ── Segmented controls (weighting, time horizon) ──
+   These pills render under data-testid="stButtonGroup" with
+   kind="segmented_control" / "segmented_controlActive" buttons
+   (verified against the Streamlit frontend bundle). */
+[data-testid="stButtonGroup"] button,
+button[kind="segmented_control"] {{
     background-color: var(--bg3) !important;
     color: var(--text2) !important;
     border-color: var(--border) !important;
     font-weight: 600;
 }}
-[data-testid="stSegmentedControl"] button p {{
+[data-testid="stButtonGroup"] button p,
+[data-testid="stButtonGroup"] button span,
+button[kind="segmented_control"] p,
+button[kind="segmented_controlActive"] p {{
     color: inherit !important;
     font-size: 0.8rem !important;
 }}
-[data-testid="stSegmentedControl"] button[aria-checked="true"],
-[data-testid="stSegmentedControl"] button[kind="segmented_controlActive"] {{
+[data-testid="stButtonGroup"] button:hover,
+button[kind="segmented_control"]:hover {{
+    color: var(--pink) !important;
+    border-color: var(--pink) !important;
+}}
+button[kind="segmented_controlActive"],
+[data-testid="stButtonGroup"] button[aria-checked="true"] {{
     background-color: var(--pink-dim) !important;
     color: var(--pink) !important;
     border-color: var(--pink) !important;
