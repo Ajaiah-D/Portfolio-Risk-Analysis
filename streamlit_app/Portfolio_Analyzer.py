@@ -117,7 +117,7 @@ if "t" in _qp and not st.session_state.get("qp_loaded"):
     st.session_state["horizon"] = _HORIZON_LABELS.get(_qp.get("h", "5"), "5Y")
     try:
         _r = float(_qp.get("r", 5.0))
-        st.session_state["rfr_pct"] = min(max(round(_r * 2) / 2, 0.0), 10.0)
+        st.session_state["rfr_pct"] = min(max(round(_r, 1), 0.0), 10.0)
     except ValueError:
         pass
     if "a" in _qp:
@@ -332,7 +332,7 @@ with st.sidebar:
     rfr_pct = st.slider(
         "Risk-Free Rate",
         min_value=0.0, max_value=10.0,
-        step=0.5, format="%.1f%%",
+        step=0.1, format="%.1f%%",
         key="rfr_pct",
         label_visibility="collapsed",
     )
