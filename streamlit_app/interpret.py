@@ -9,59 +9,59 @@ INT_DISPLAY = {"DivScore"}
 
 def interpret_sharpe(v):
     if pd.isna(v): return "bb", "Benchmark", "SPY is used as the market benchmark."
-    if v >= 2.0:   return "bg", "Exceptional", "Returns far exceed the risk taken — rare and highly desirable."
+    if v >= 2.0:   return "bg", "Exceptional", "Returns far exceed the risk taken. Rare, and exactly what you want."
     if v >= 1.0:   return "bg", "Strong", "Each unit of risk is well compensated. Above 1 is considered solid."
-    if v >= 0.5:   return "by", "Acceptable", "Moderate returns relative to volatility — room to improve."
+    if v >= 0.5:   return "by", "Acceptable", "Moderate returns for the volatility. Room to improve."
     if v >= 0.0:   return "by", "Weak", "Returns barely compensate for the risk being taken."
-    return "br", "Negative", "Losing value relative to the risk-free rate — risk goes unrewarded."
+    return "br", "Negative", "Losing value against the risk-free rate. The risk is not paying you."
 
 def interpret_sortino(v):
     if pd.isna(v): return "bb", "Benchmark", "SPY is used as the market benchmark."
     if v >= 2.0:   return "bg", "Excellent", "Strong gains with tightly controlled downside moves."
     if v >= 1.0:   return "bg", "Good", "Upward potential clearly outweighs downside volatility."
-    if v >= 0.5:   return "by", "Moderate", "Some downside exposure — manageable but worth watching."
+    if v >= 0.5:   return "by", "Moderate", "Some downside exposure. Manageable, but worth watching."
     if v >= 0.0:   return "by", "Limited", "Gains barely outpace downside volatility."
-    return "br", "High Risk", "Downside losses dominate — portfolio hit hard on bad days."
+    return "br", "High Risk", "Downside losses dominate. The portfolio gets hit hard on bad days."
 
 def interpret_beta(v):
     if pd.isna(v): return "bb", "Benchmark", "Beta is 1.0 by definition for SPY."
-    if v < 0:      return "bp", "Inverse", "Moves opposite the market — acts as a partial hedge."
-    if v < 0.5:    return "bg", "Very Defensive", "Low market sensitivity — largely independent of swings."
+    if v < 0:      return "bp", "Inverse", "Moves opposite the market, so it acts as a partial hedge."
+    if v < 0.5:    return "bg", "Very Defensive", "Low market sensitivity. Largely independent of market swings."
     if v < 0.8:    return "bg", "Defensive", "Less volatile than the broader market."
     if v <= 1.2:   return "by", "Market-Like", "Tracks the market closely. Typical for large-cap US stocks."
-    if v <= 1.5:   return "by", "Aggressive", "Amplifies market moves — bigger upside and steeper drops."
+    if v <= 1.5:   return "by", "Aggressive", "Amplifies market moves. Bigger upside, steeper drops."
     return "br", "Very Aggressive", "Highly sensitive to market swings. Expect magnified gains and losses."
 
 def interpret_drawdown(v):
     if pd.isna(v): return "bb", "N/A", ""
-    if v > -0.05:  return "bg", "Minimal", "Less than 5% peak-to-trough — very resilient over this period."
-    if v > -0.15:  return "bg", "Low", "Max drop stayed below 15% — reasonable drawdown resilience."
+    if v > -0.05:  return "bg", "Minimal", "Less than 5% peak-to-trough. Very resilient over this period."
+    if v > -0.15:  return "bg", "Low", "The worst drop stayed under 15%. Reasonable resilience."
     if v > -0.25:  return "by", "Moderate", "Dropped up to 25% from peak. Worth monitoring in corrections."
-    if v > -0.40:  return "by", "Severe", "Significant losses from peak — high-volatility holding."
-    return "br", "Extreme", "Lost over 40% from its high — very high risk of deep losses."
+    if v > -0.40:  return "by", "Severe", "Significant losses from the peak. A high-volatility holding."
+    return "br", "Extreme", "Lost over 40% from its high. Deep losses are a real possibility here."
 
 def interpret_var(v):
     if pd.isna(v): return "bb", "N/A", ""
     pct = abs(v) * 100
     if pct < 1.5:  return "bg", "Low", "On a bad day (bottom 5%), expected daily loss is under 1.5%."
     if pct < 2.5:  return "by", "Moderate", f"Worst days can see around {pct:.1f}% lost in a single session."
-    if pct < 3.5:  return "by", "Elevated", f"Tail risk is elevated — worst days up to {pct:.1f}% lost."
-    return "br", "High", f"Up to {pct:.1f}% can be lost on the worst days — significant daily tail risk."
+    if pct < 3.5:  return "by", "Elevated", f"Tail risk is elevated. The worst days lose up to {pct:.1f}%."
+    return "br", "High", f"Up to {pct:.1f}% can be lost on the worst days. Significant daily tail risk."
 
 def interpret_cvar(v):
     if pd.isna(v): return "bb", "N/A", ""
     pct = abs(v) * 100
     if pct < 2.0:  return "bg", "Low", f"Average loss across the worst 5% of days is only {pct:.1f}%."
-    if pct < 3.0:  return "by", "Moderate", f"Average worst-case daily loss is {pct:.1f}% — within range."
+    if pct < 3.0:  return "by", "Moderate", f"Average worst-case daily loss is {pct:.1f}%. Within normal range."
     if pct < 4.5:  return "by", "Elevated", f"Average loss on worst days is {pct:.1f}%. Worth hedging."
-    return "br", "Severe", f"Average worst-case loss of {pct:.1f}% — heavy tail exposure."
+    return "br", "Severe", f"Average worst-case loss of {pct:.1f}%. Heavy tail exposure."
 
 def interpret_div_score(v):
     if pd.isna(v): return "bb", "N/A", ""
-    if v >= 65: return "bg", "Well Diversified", f"Score {v:.0f}/100 — holdings move independently, reducing overall risk."
-    if v >= 45: return "by", "Moderate", f"Score {v:.0f}/100 — some overlap in how holdings move. Uncorrelated assets would help."
-    if v >= 25: return "by", "Concentrated", f"Score {v:.0f}/100 — many holdings move together. A market drop likely hits all at once."
-    return "br", "Highly Concentrated", f"Score {v:.0f}/100 — holdings are tightly correlated. Little diversification benefit."
+    if v >= 65: return "bg", "Well Diversified", f"Score {v:.0f}/100. Holdings move independently, which lowers overall risk."
+    if v >= 45: return "by", "Moderate", f"Score {v:.0f}/100. Some overlap in how holdings move. Uncorrelated assets would help."
+    if v >= 25: return "by", "Concentrated", f"Score {v:.0f}/100. Many holdings move together, so a market drop likely hits all of them at once."
+    return "br", "Highly Concentrated", f"Score {v:.0f}/100. Holdings are tightly correlated. Little diversification benefit."
 
 
 INTERPRETERS = {

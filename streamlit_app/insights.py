@@ -45,23 +45,23 @@ def generate_insights(
         out.append({
             "level": "good", "tag": "vs. Market",
             "text": (f"Your portfolio returned <b>{port_total*100:+.1f}%</b> vs SPY's "
-                     f"<b>{spy_total*100:+.1f}%</b> over this period — with "
+                     f"<b>{spy_total*100:+.1f}%</b> over this period, with "
                      f"{'similar' if vol_ratio > 0.95 else 'less'} volatility "
-                     f"({vol_ratio:.2f}× the market's). That's the ideal combination."),
+                     f"({vol_ratio:.2f}× the market's). That is the combination you want."),
         })
     elif beat:
         out.append({
             "level": "info", "tag": "vs. Market",
             "text": (f"Your portfolio beat SPY (<b>{port_total*100:+.1f}%</b> vs "
                      f"<b>{spy_total*100:+.1f}%</b>), but took <b>{vol_ratio:.2f}×</b> the "
-                     f"market's volatility to do it. Higher returns from higher risk — "
-                     f"make sure that trade-off is intentional."),
+                     f"market's volatility to do it. Higher returns from higher risk. "
+                     f"Make sure that trade is one you actually want."),
         })
     else:
         out.append({
             "level": "warn", "tag": "vs. Market",
             "text": (f"Your portfolio returned <b>{port_total*100:+.1f}%</b> vs SPY's "
-                     f"<b>{spy_total*100:+.1f}%</b> — it underperformed simply holding the "
+                     f"<b>{spy_total*100:+.1f}%</b>. It underperformed simply holding the "
                      f"index over this period"
                      + (f", while carrying <b>{vol_ratio:.2f}×</b> the volatility." if vol_ratio > 1.05 else ".")),
         })
@@ -80,13 +80,13 @@ def generate_insights(
                 "level": "risk", "tag": "Correlation",
                 "text": (f"<b>{best_pair[0]}</b> and <b>{best_pair[1]}</b> moved almost "
                          f"identically (correlation {best_val:.2f}). They effectively act as "
-                         f"one position — you have less diversification than the holding count suggests."),
+                         f"one position, so you have less diversification than the holding count suggests."),
             })
         elif best_pair and best_val >= 0.70:
             out.append({
                 "level": "warn", "tag": "Correlation",
                 "text": (f"<b>{best_pair[0]}</b> and <b>{best_pair[1]}</b> are strongly linked "
-                         f"(correlation {best_val:.2f}) — expect them to fall together in a downturn."),
+                         f"(correlation {best_val:.2f}). Expect them to fall together in a downturn."),
             })
 
     # 3 ── Sector concentration
@@ -107,13 +107,13 @@ def generate_insights(
             out.append({
                 "level": "warn", "tag": "Sector",
                 "text": (f"<b>{top_sector}</b> is your largest sector at <b>{top_w*100:.0f}%</b> "
-                         f"of the portfolio — meaningful concentration worth monitoring."),
+                         f"of the portfolio. That is meaningful concentration worth watching."),
             })
         elif len(buckets) >= 4:
             out.append({
                 "level": "good", "tag": "Sector",
                 "text": (f"Your money is spread across <b>{len(buckets)}</b> sectors with no single "
-                         f"sector above {top_w*100:.0f}% — a balanced sector footprint."),
+                         f"sector above {top_w*100:.0f}%. A balanced footprint."),
             })
 
     # 4 ── Weight concentration (effective positions)
@@ -122,7 +122,7 @@ def generate_insights(
         out.append({
             "level": "warn", "tag": "Weights",
             "text": (f"You hold {len(held)} tickers, but your weights concentrate into roughly "
-                     f"<b>{n_eff:.1f} effective positions</b> — a few large holdings dominate the risk."),
+                     f"<b>{n_eff:.1f} effective positions</b>. A few large holdings carry most of the risk."),
         })
 
     # 5 ── Volatility driver
@@ -172,8 +172,8 @@ def generate_insights(
     if div_score < 40 and len(held) >= 2:
         out.append({
             "level": "info", "tag": "Diversify",
-            "text": ("Most of your holdings move together. Assets from other classes — bond ETFs "
-                     "(e.g. AGG, BND), gold (GLD), or international funds — tend to move independently "
+            "text": ("Most of your holdings move together. Assets from other classes, like bond ETFs "
+                     "(AGG, BND), gold (GLD), or international funds, tend to move independently "
                      "of US stocks and would raise your diversification score."),
         })
 

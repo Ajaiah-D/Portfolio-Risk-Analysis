@@ -256,7 +256,42 @@ header[data-testid="stHeader"] {{
     filter: brightness(1.03);
 }}
 .stButton > button:active {{ transform: translateY(0); }}
-[data-testid="stBaseButton-primary"] {{ color: #ffffff !important; }}
+
+/* Secondary buttons keep the light base-theme's white pill, while the global
+   text rule forces their labels white in dark mode. Theme them explicitly. */
+[data-testid="stBaseButton-secondary"] {{
+    background-color: var(--bg3) !important;
+    border: 1px solid var(--border) !important;
+}}
+[data-testid="stBaseButton-secondary"],
+[data-testid="stBaseButton-secondary"] p,
+[data-testid="stBaseButton-secondary"] span {{
+    color: var(--text) !important;
+}}
+[data-testid="stBaseButton-secondary"]:hover {{
+    border-color: var(--pink) !important;
+}}
+[data-testid="stBaseButton-secondary"]:hover p,
+[data-testid="stBaseButton-secondary"]:hover span {{
+    color: var(--pink) !important;
+}}
+
+/* Primary button label must stay white on the pink fill in both modes */
+[data-testid="stBaseButton-primary"],
+[data-testid="stBaseButton-primary"] p,
+[data-testid="stBaseButton-primary"] span {{
+    color: #ffffff !important;
+}}
+
+/* Number input +/- steppers: same light-pill problem in dark mode */
+[data-testid="stNumberInput"] button {{
+    background-color: var(--bg3) !important;
+    border-color: var(--border) !important;
+}}
+[data-testid="stNumberInput"] button svg {{
+    color: var(--text) !important;
+    fill: var(--text) !important;
+}}
 
 /* ── Inputs: soften corners ── */
 [data-baseweb="select"] > div,
