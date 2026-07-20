@@ -169,6 +169,40 @@ header[data-testid="stHeader"] {{
     min-width: 380px !important;
 }}
 
+/* ── Sidebar page navigation (Portfolio Analyzer / Glossary links) ──
+   Streamlit's built-in nav keeps its light-theme hover highlight, which in
+   dark mode puts white text on a near-white pill. Re-theme every state. */
+[data-testid="stSidebarNav"] a,
+[data-testid="stSidebarNav"] a span {{
+    color: var(--text) !important;
+}}
+[data-testid="stSidebarNav"] a:hover {{
+    background-color: var(--bg3) !important;
+}}
+[data-testid="stSidebarNav"] a:hover span {{
+    color: var(--pink) !important;
+}}
+[data-testid="stSidebarNav"] a[aria-current="page"] {{
+    background-color: var(--pink-dim) !important;
+}}
+[data-testid="stSidebarNav"] a[aria-current="page"] span {{
+    color: var(--pink) !important;
+}}
+[data-testid="stSidebarNav"] svg {{
+    color: var(--text2) !important;
+    fill: var(--text2) !important;
+}}
+[data-testid="stSidebarNavSeparator"] {{
+    border-color: var(--border) !important;
+}}
+[data-testid="stSidebarCollapseButton"] button,
+[data-testid="stSidebarCollapseButton"] svg,
+[data-testid="stSidebarCollapsedControl"] button,
+[data-testid="stSidebarCollapsedControl"] svg {{
+    color: var(--text2) !important;
+    fill: var(--text2) !important;
+}}
+
 /* ── Tabs ── */
 [data-testid="stTabs"] [data-baseweb="tab-list"] {{
     gap: 0.35rem;
