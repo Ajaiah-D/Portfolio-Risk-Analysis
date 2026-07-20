@@ -38,6 +38,23 @@ html, body, [class*="css"] {{ font-family: 'Inter', sans-serif; }}
 [data-testid="stSidebar"] {{ background-color: var(--bg2) !important; border-right: 1px solid var(--border); }}
 p, span, label, div, h1, h2, h3, h4, li {{ color: var(--text) !important; }}
 
+/* ── Sidebar page navigation — re-theme Streamlit's light-theme hover ── */
+[data-testid="stSidebarNav"] a,
+[data-testid="stSidebarNav"] a span {{ color: var(--text) !important; }}
+[data-testid="stSidebarNav"] a:hover {{ background-color: var(--bg3) !important; }}
+[data-testid="stSidebarNav"] a:hover span {{ color: var(--pink) !important; }}
+[data-testid="stSidebarNav"] a[aria-current="page"] {{ background-color: var(--pink-dim) !important; }}
+[data-testid="stSidebarNav"] a[aria-current="page"] span {{ color: var(--pink) !important; }}
+[data-testid="stSidebarNav"] svg {{ color: var(--text2) !important; fill: var(--text2) !important; }}
+[data-testid="stSidebarNavSeparator"] {{ border-color: var(--border) !important; }}
+[data-testid="stSidebarCollapseButton"] button,
+[data-testid="stSidebarCollapseButton"] svg,
+[data-testid="stSidebarCollapsedControl"] button,
+[data-testid="stSidebarCollapsedControl"] svg {{
+    color: var(--text2) !important;
+    fill: var(--text2) !important;
+}}
+
 .hero-title {{ font-size: 2rem; font-weight: 700; color: var(--text); letter-spacing: -0.5px; margin: 0 0 0.35rem 0; }}
 .hero-title span {{ color: var(--pink); }}
 .hero-sub {{ font-size: 0.9rem; color: var(--text2); margin: 0 0 2rem 0; line-height: 1.6; }}
