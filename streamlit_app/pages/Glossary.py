@@ -38,13 +38,26 @@ html, body, [class*="css"] {{ font-family: 'Inter', sans-serif; }}
 [data-testid="stSidebar"] {{ background-color: var(--bg2) !important; border-right: 1px solid var(--border); }}
 p, span, label, div, h1, h2, h3, h4, li {{ color: var(--text) !important; }}
 
-/* ── Sidebar page navigation — re-theme Streamlit's light-theme hover ── */
+/* ── Sidebar page navigation — strip Streamlit's light-theme pill
+   backgrounds (resting/hover/current), then restyle with theme colors ── */
+[data-testid="stSidebarNav"],
+[data-testid="stSidebarNav"] ul,
+[data-testid="stSidebarNav"] li,
+[data-testid="stSidebarNav"] li > div,
 [data-testid="stSidebarNav"] a,
-[data-testid="stSidebarNav"] a span {{ color: var(--text) !important; }}
-[data-testid="stSidebarNav"] a:hover {{ background-color: var(--bg3) !important; }}
+[data-testid="stSidebarNav"] a > div,
+[data-testid="stSidebarNav"] a span {{
+    background-color: transparent !important;
+    color: var(--text) !important;
+}}
+[data-testid="stSidebarNav"] a:hover,
+[data-testid="stSidebarNav"] a:hover > div {{ background-color: var(--bg3) !important; }}
 [data-testid="stSidebarNav"] a:hover span {{ color: var(--pink) !important; }}
-[data-testid="stSidebarNav"] a[aria-current="page"] {{ background-color: var(--pink-dim) !important; }}
-[data-testid="stSidebarNav"] a[aria-current="page"] span {{ color: var(--pink) !important; }}
+[data-testid="stSidebarNav"] a[aria-current="page"],
+[data-testid="stSidebarNav"] a[aria-current="true"],
+[data-testid="stSidebarNav"] a[aria-current="page"] > div {{ background-color: var(--pink-dim) !important; }}
+[data-testid="stSidebarNav"] a[aria-current="page"] span,
+[data-testid="stSidebarNav"] a[aria-current="true"] span {{ color: var(--pink) !important; }}
 [data-testid="stSidebarNav"] svg {{ color: var(--text2) !important; fill: var(--text2) !important; }}
 [data-testid="stSidebarNavSeparator"] {{ border-color: var(--border) !important; }}
 [data-testid="stSidebarCollapseButton"] button,
