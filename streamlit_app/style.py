@@ -223,6 +223,19 @@ header[data-testid="stHeader"] {{
     fill: var(--text2) !important;
 }}
 
+/* Pin the collapse arrow to the top of the sidebar so it stays reachable
+   when the sidebar's own content is long enough to scroll (this app's
+   sidebar has many widgets, unlike the Glossary page's single toggle,
+   which never scrolls and never shows this problem). Without this, the
+   arrow scrolls away with the widgets above it and becomes unreachable. */
+[data-testid="stSidebarCollapseButton"] {{
+    position: sticky !important;
+    top: 0 !important;
+    z-index: 999 !important;
+    background-color: var(--bg2) !important;
+    padding-bottom: 0.4rem !important;
+}}
+
 /* ── Tabs ── */
 [data-testid="stTabs"] [data-baseweb="tab-list"] {{
     gap: 0.35rem;
