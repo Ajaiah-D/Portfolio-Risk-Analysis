@@ -1,6 +1,6 @@
 from airflow import DAG
 from airflow.operators.python import PythonOperator
-from datetime import datetime
+from datetime import datetime, timedelta
 import pandas as pd
 from scripts.fetch_data import fetch_prices, fetch_ticker_metadata
 from scripts.store_data import store_prices, store_metadata
@@ -10,10 +10,10 @@ def log_info(msg):
     print(f"[INFO] {msg}")
 
 def ingest_all_tickers():
-    df = pd.read_csv("data/constituents.csv")
+    df = pd.read_csv("tickers/constituents.csv")
     tickers = df["Symbol"].unique()
-    end_date = "2025-07-18"
-    start_date = "2015-07-18"
+    end_date = datetime.today().strftime("%Y-%m-%d")
+    start_date = (datetime.today() - timedelta(days=365 * 10)).strftime("%Y-%m-%d")
     failed_tickers = []
 
     for ticker in tickers:
