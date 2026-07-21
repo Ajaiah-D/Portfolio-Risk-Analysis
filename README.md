@@ -1,20 +1,22 @@
 # Portfolio Risk Analysis
 
-An interactive portfolio risk dashboard built with Streamlit, backed by a local SQLite database of historical price data sourced from Massive.com (formerly Polygon.io) and yfinance. Built for two audiences at once: people who want to understand what their portfolio actually does, and people learning what these metrics mean in the first place — every number comes with a plain-English interpretation and a full glossary.
+**[Live demo →](https://ajaiah-d-portfolio-risk--streamlit-appportfolio-analyzer-ij9gqb.streamlit.app/)**
+
+An interactive portfolio risk dashboard built with Streamlit, deployed on Streamlit Community Cloud, backed by a SQLite database of historical price data sourced from Massive.com (formerly Polygon.io) and yfinance. Built for two audiences at once: people who want to understand what their portfolio actually does, and people learning what these metrics mean in the first place. Every number comes with a plain-English interpretation and a full glossary.
 
 ---
 
 ## What It Does
 
-- Select up to 25 S&P 500 stocks and/or ETFs; SPY is always included as the market benchmark (and can also be held as a position)
+- Search and select up to 25 stocks and ETFs from a universe of 500+ S&P 500 constituents plus 30+ ETFs across broad market, sector, bond, dividend, real asset, and international categories; SPY is always included as the market benchmark (and can also be held as a position)
 - **Analyze your real portfolio**: enter the dollar amount you hold in each position, or use equal weighting to explore. Set a total portfolio value and amounts auto-balance to it — edit one holding and the rest adjust, with a warning if an edit would exceed the total
-- Filter the stock universe by GICS sector; choose a 1–10 year horizon and adjustable risk-free rate
+- Filter the stock universe by GICS sector; choose a 1–10 year horizon and a risk-free rate adjustable in 0.1% steps
 - **Overview tab** — scorecard vs SPY (return, volatility, Sharpe, max drawdown), seven interpreted metric cards, and automatic plain-English insights (correlation clusters, sector concentration, risk drivers, worst month, improvement opportunities)
 - **Performance tab** — cumulative returns vs SPY, per-asset metrics table, sector exposure
 - **Risk tab** — underwater (drawdown) chart, rolling volatility, and rolling beta, showing *when* risk showed up rather than one number for the whole period
 - **Diversification tab** — 0–100 diversification score (correlation × effective positions), correlation matrix heatmap
 - **What-If & Optimize tab** — approximate max-Sharpe and min-volatility reference allocations with a suggested rebalance table, an efficient frontier (2,500 random portfolios), and live weight sliders that update every metric instantly
-- **Planning tab** — Monte Carlo simulation (1,000 paths) with target value and probability of reaching it
+- **Planning tab** — Monte Carlo simulation (1,000 paths) with target value and probability of reaching it, fully recalculated on every input change
 - Portfolios are saved in the page URL — bookmark or share a link and the analysis reloads
 - Full dark/light mode, onboarding flow with a one-click example portfolio
 
@@ -27,27 +29,36 @@ Massive.com API ──► fetch_data.py ──► store_data.py ──► SQLite
 yfinance        ──► backfill_yfinance.py ─────────────► SQLite (gap fill)
 yfinance        ──► refresh_prices.py ────────────────► SQLite (forward refresh)
 GitHub Actions  ──► refresh_prices.py (daily, Mon–Fri) ► cache-persisted SQLite + last_updated.json
-
-SQLite ──► data/helpers.py ──► metrics/ (core, optimize)
+                                                                     │
+                                                     GitHub Release (data-seed, rolling backup)
+                                                                     │
+                                                     Streamlit Cloud ► downloads DB on cold start
+                                                                     │
+SQLite ──► data/helpers.py ──► metrics/ (core, optimize, allocation)
                                   │
                        streamlit_app/ (Portfolio_Analyzer + charts, insights, interpret, style)
 ```
 
-Data is ingested once and refreshed forward on demand. The Streamlit app reads only from SQLite — no live API calls at runtime.
+Data is ingested once and refreshed forward daily. The Streamlit app itself never calls a live pricing API — it only reads SQLite. On Streamlit Cloud, where the database can't be committed to git, the app downloads it once per cold start from the same GitHub Release the automation keeps fresh, then behaves identically to a local run.
 
 | Module | Responsibility |
 |---|---|
 | `metrics/core.py` | Pure-function metric computations (Sharpe, Sortino, Beta, drawdown, VaR/CVaR, diversification score) |
 | `metrics/optimize.py` | Long-only max-Sharpe / min-volatility search (iterated Dirichlet sampling — no solver dependency) |
+| `streamlit_app/allocation.py` | Budget-constrained dollar allocation: locks edited holdings, auto-balances the rest to a target total |
 | `streamlit_app/charts.py` | All Plotly chart builders (pure functions of data + theme) |
 | `streamlit_app/insights.py` | Rule-based plain-English findings engine |
 | `streamlit_app/interpret.py` | Metric interpretations, badge ranges, card rendering, table stylers |
 | `streamlit_app/style.py` | CSS theming (light/dark via custom properties) |
-| `streamlit_app/Portfolio_Analyzer.py` | Orchestration: sidebar, state, tabs |
+| `streamlit_app/Portfolio_Analyzer.py` | Orchestration: DB bootstrap, sidebar, state, tabs |
 
 ---
 
 ## Key Engineering Decisions
+
+**Deployable without committing a 95MB+ database** — the price database is gitignored (too large for GitHub's per-file limits and only growing). Streamlit Cloud's container starts with no local disk state, so the app checks for the database on startup and downloads it from a GitHub Release if it's missing, then proceeds exactly as it would locally. The same release is kept fresh daily by the ingestion automation, so a cold start is never more than a day stale.
+
+**Budget-constrained allocation, not just weights** — `allocation.py` treats a portfolio value as a real budget: editing one holding's dollar amount locks it and re-splits the remainder across the rest so the total always equals the budget, and an edit that would exceed it is rejected with a warning instead of silently accepted. Kept as pure functions so the rebalancing rules (including the exact "$5 across 4 holdings" edge case) are unit-tested independent of any UI state.
 
 **Real weights, alignment-safe** — portfolio functions accept `{ticker: weight}` dicts and align them to the returns matrix internally, so column ordering can never silently mismatch weights.
 
@@ -65,9 +76,9 @@ Data is ingested once and refreshed forward on demand. The Streamlit app reads o
 
 **Shareable state in the URL** — the selected tickers, amounts, horizon, and risk-free rate are serialised into query params after each run, making any analysis a bookmarkable link.
 
-**Dark mode CSS scoping workaround** — Streamlit popovers render in a separate stacking context where CSS custom properties don't resolve; dark mode injects a second hardcoded CSS block targeting popover elements.
+**Dark mode CSS scoping workarounds** — several of Streamlit's built-in components (popovers, the sidebar page navigation, secondary buttons) paint their own light-theme backgrounds outside the normal component tree, so CSS custom properties don't reach them. Dark mode targets each one directly by its actual test ID, verified against Streamlit's compiled frontend bundle rather than assumed from the component name.
 
-**Tested at three levels** — unit tests for the metrics engine (hand-checked values), analytic-solution tests for the optimizer, and end-to-end `streamlit.testing.AppTest` runs that execute the real app headlessly (empty state, example flow, URL prefill, custom amounts).
+**Tested at three levels** — unit tests for the metrics engine and the allocation/rebalancing logic (hand-checked values), analytic-solution tests for the optimizer, and end-to-end `streamlit.testing.AppTest` runs that execute the real app headlessly (empty state, example flow, URL prefill, custom amounts, Monte Carlo recalculation on input change).
 
 **Automated refresh without committing the database** — the DB is gitignored because it's too large for GitHub (95MB+ and growing, close to GitHub's 100MB hard per-file limit). A daily GitHub Actions workflow persists it between runs via `actions/cache` instead of git, and refreshes it forward with `refresh_prices.py`. Only a small `data/last_updated.json` (timestamp, ticker count, date range, row count) gets committed — that's the freshness signal any health check reads, without ever touching a large binary in git history.
 
@@ -107,10 +118,13 @@ pip install -r requirements.txt
 # 2. Add your API key
 echo "POLYGON_API_KEY=your_key_here" > scripts/.env
 
-# 3. Ingest price data (one-time; takes ~5 min on free tier due to rate limiting)
+# 3. Ingest price data (one-time; ~500 S&P 500 stocks + 30+ ETFs).
+#    Massive's free tier is rate-limited to 5 req/min (2 calls per ticker,
+#    13s sleep between calls), so a full run takes several hours. Safe to
+#    interrupt and re-run — already-stored (ticker, date) rows are skipped.
 python scripts/ingest_all_tickers.py
 
-# 4. Optional: backfill history to 2020-01-01
+# 4. Optional: backfill history further back than step 3 reached
 python scripts/backfill_history.py      # via Massive.com (slower, rate-limited)
 python scripts/backfill_yfinance.py     # via yfinance (faster, fills gaps)
 
@@ -144,7 +158,15 @@ gh release create data-seed data/portfolio_data.db \
   --notes "Bootstrap fallback for the daily refresh workflow."
 ```
 
-After that, the workflow is self-sufficient — no secrets beyond the default `GITHUB_TOKEN` are required.
+After that, the workflow is self-sufficient — no secrets beyond the default `GITHUB_TOKEN` are required. The same `data-seed` release doubles as the bootstrap source for the Streamlit Cloud deploy below, so both stay in sync automatically.
+
+---
+
+## Deployment (Streamlit Community Cloud)
+
+The app is deployed at the link at the top of this README. Streamlit Cloud builds directly from this repo, but its containers have no persistent disk and the database is gitignored — so `Portfolio_Analyzer.py` checks for `data/portfolio_data.db` on startup and downloads it from the `data-seed` GitHub Release if it's missing (a few seconds, shown with a spinner). This only happens on a cold start; once running, the container reuses the same file for every visitor until it sleeps again.
+
+No secrets are required in Streamlit Cloud's dashboard — the app never calls a live pricing API, only the public release URL.
 
 ---
 
@@ -154,7 +176,8 @@ After that, the workflow is self-sufficient — no secrets beyond the default `G
 ├── .github/workflows/
 │   └── refresh_data.yml        # Daily automated price refresh (see above)
 ├── streamlit_app/
-│   ├── Portfolio_Analyzer.py   # Orchestration: sidebar, session state, tabs
+│   ├── Portfolio_Analyzer.py   # Orchestration: DB bootstrap, sidebar, session state, tabs
+│   ├── allocation.py           # Budget-constrained dollar allocation for custom weighting
 │   ├── charts.py               # Plotly chart builders
 │   ├── insights.py             # Rule-based plain-English findings
 │   ├── interpret.py            # Metric interpretations + card rendering
@@ -170,8 +193,8 @@ After that, the workflow is self-sufficient — no secrets beyond the default `G
 │   └── last_updated.json       # Freshness metadata (git-tracked, small)
 ├── scripts/
 │   ├── fetch_data.py           # Massive.com API client (formerly Polygon.io)
-│   ├── store_data.py           # SQLite write functions
-│   ├── ingest_all_tickers.py   # Initial ingestion for S&P 500 + ETF list
+│   ├── store_data.py           # Idempotent SQLite write functions (INSERT OR IGNORE)
+│   ├── ingest_all_tickers.py   # Initial ingestion for S&P 500 + ETF universe
 │   ├── backfill_history.py     # Extends history via Massive.com (rate-limited)
 │   ├── backfill_yfinance.py    # Fills historical gaps via yfinance
 │   ├── refresh_prices.py       # Forward refresh to yesterday via yfinance
@@ -181,6 +204,7 @@ After that, the workflow is self-sufficient — no secrets beyond the default `G
 ├── tests/
 │   ├── test_core.py            # Metrics engine unit tests
 │   ├── test_optimize.py        # Optimizer vs analytic solutions
+│   ├── test_allocation.py      # Budget-rebalancing logic unit tests
 │   └── test_app.py             # Headless end-to-end app runs (AppTest)
 ├── tickers/
 │   └── constituents.csv        # S&P 500 constituents with GICS sectors
@@ -195,11 +219,13 @@ After that, the workflow is self-sufficient — no secrets beyond the default `G
 | Layer | Technology |
 |---|---|
 | UI / app framework | Streamlit |
+| Deployment | Streamlit Community Cloud |
+| Automation | GitHub Actions (scheduled cron + manual dispatch) |
 | Charts | Plotly |
 | Data manipulation | pandas, NumPy |
 | Database | SQLite (via `sqlite3`) |
-| Primary data source | Massive.com REST API (formerly Polygon.io) |
-| Backfill / refresh source | yfinance |
+| Initial data source | Massive.com REST API (formerly Polygon.io) |
+| Backfill / daily refresh source | yfinance |
 | Styling | CSS custom properties injected via `st.markdown` |
 | Testing | pytest + `streamlit.testing.AppTest` |
 | Language | Python 3.10+ |
