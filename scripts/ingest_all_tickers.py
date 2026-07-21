@@ -1,3 +1,5 @@
+import datetime
+
 import pandas as pd
 from scripts.fetch_data import fetch_prices, fetch_ticker_metadata
 from scripts.store_data import store_prices, store_metadata
@@ -14,15 +16,18 @@ ETF_LIST = [
     # Sector SPDRs
     "XLK", "XLF", "XLE", "XLV", "XLY", "XLP", "XLI", "XLB", "XLRE", "XLC",
     # International
-    "EFA", "VEA", "EEM", "VWO"
+    "EFA", "VEA", "EEM", "VWO",
+    # Bonds
+    "AGG", "BND", "TLT",
+    # Dividend
+    "SCHD", "VYM", "VIG",
 ]
 
 def ingest_all_tickers():
-    # df = pd.read_csv("tickers/constituents.csv")
-    # tickers = df["Symbol"].unique()
-    tickers = ETF_LIST
-    end_date = "2025-07-18"
-    start_date = "2015-07-18"
+    sp500 = pd.read_csv("tickers/constituents.csv")["Symbol"].unique().tolist()
+    tickers = sp500 + ETF_LIST
+    end_date = datetime.date.today().isoformat()
+    start_date = (datetime.date.today() - datetime.timedelta(days=365 * 10)).isoformat()
     failed_tickers = []
 
     for ticker in tickers:
@@ -48,4 +53,3 @@ def ingest_all_tickers():
 
 if __name__ == "__main__":
     ingest_all_tickers()
-    
