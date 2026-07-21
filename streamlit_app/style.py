@@ -161,12 +161,19 @@ header[data-testid="stHeader"] {{
 [data-testid="stSidebar"] {{
     background-color: var(--bg2) !important;
     border-right: 1px solid var(--border);
-    /* Streamlit's default drag-resized width is narrower than the Weighting
-       and Time Horizon segmented controls need, so they wrap onto a second
-       row instead of showing as one row of pills. min-width sets a floor
-       without disabling the drag handle — users can still widen it further,
-       just never narrower than this. */
-    min-width: 380px !important;
+}}
+
+/* Streamlit's default drag-resized sidebar width is narrower than the
+   Weighting and Time Horizon segmented controls need, so they wrap onto a
+   second row instead of showing as one row of pills. min-width sets a floor
+   on desktop without disabling the drag handle - users can still widen it
+   further, just never narrower than this. Scoped to viewports wide enough
+   to have a docked sidebar at all (Streamlit renders it as a full-width
+   overlay drawer on phones), so this never fights the mobile layout. */
+@media (min-width: 640px) {{
+    [data-testid="stSidebar"] {{
+        min-width: 380px !important;
+    }}
 }}
 
 /* ── Sidebar page navigation (Portfolio Analyzer / Glossary links) ──
