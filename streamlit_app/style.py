@@ -23,6 +23,8 @@ _CSS = """
     --tint2:  color-mix(in srgb, currentColor 8%, transparent);
     --line:   color-mix(in srgb, currentColor 14%, transparent);
     --shadow: rgba(0,0,0,0.08);
+    /* Near-square corners everywhere; matches baseRadius in config.toml. */
+    --radius: 2px;
 
     /* Accents: mid-tones that hold contrast on both backgrounds. */
     --pink:       #fc88e5;
@@ -104,8 +106,8 @@ hr.section-rule {
     background: var(--tint);
     border: 1px solid var(--line);
     border-left: 3px solid var(--pink);
-    border-radius: 10px;
-    padding: 0.85rem 1.15rem;
+    border-radius: var(--radius);
+    padding: 1rem 1.25rem;
     margin-bottom: 1.6rem;
     font-size: 0.84rem; line-height: 1.8;
 }
@@ -115,8 +117,8 @@ hr.section-rule {
 .insight {
     background: var(--tint);
     border: 1px solid var(--line);
-    border-radius: 10px;
-    padding: 0.8rem 1.05rem;
+    border-radius: var(--radius);
+    padding: 0.9rem 1.15rem;
     margin-bottom: 0.5rem;
     font-size: 0.84rem; line-height: 1.6;
     transition: border-color 0.15s ease, transform 0.15s ease;
@@ -129,7 +131,7 @@ hr.section-rule {
 .insight-info { border-left: 3px solid var(--neutral); }
 .insight-tag {
     display: inline-block; padding: 0.1rem 0.5rem; margin-right: 0.5rem;
-    border-radius: 20px; font-size: 0.63rem; font-weight: 700;
+    border-radius: var(--radius); font-size: 0.63rem; font-weight: 700;
     text-transform: uppercase; letter-spacing: 0.06em;
 }
 
@@ -137,13 +139,13 @@ hr.section-rule {
 .scard, .mcard {
     background: var(--tint);
     border: 1px solid var(--line);
-    border-radius: 13px;
+    border-radius: var(--radius);
     box-shadow: 0 1px 4px var(--shadow);
     margin-bottom: 0.55rem;
     transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
 }
-.scard { padding: 0.85rem 1rem; }
-.mcard { padding: 1.1rem 1.2rem; }
+.scard { padding: 1rem 1.15rem; }
+.mcard { padding: 1.25rem 1.35rem; }
 .scard:hover, .mcard:hover {
     transform: translateY(-2px);
     box-shadow: 0 6px 18px var(--shadow);
@@ -172,7 +174,7 @@ hr.section-rule {
 .chip {
     display: inline-block;
     background: var(--tint2); border: 1px solid var(--line);
-    border-radius: 5px; padding: 0.12rem 0.5rem;
+    border-radius: var(--radius); padding: 0.12rem 0.5rem;
     font-size: 0.75rem; font-weight: 600; margin: 0.1rem;
 }
 .chip-bench {
@@ -191,7 +193,7 @@ hr.section-rule {
 }
 .mcard-badge {
     display: inline-block; padding: 0.15rem 0.55rem;
-    border-radius: 20px; font-size: 0.67rem; font-weight: 700;
+    border-radius: var(--radius); font-size: 0.67rem; font-weight: 700;
     text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.5rem;
 }
 .bg { background: var(--good-dim);    color: var(--good);    }
@@ -209,7 +211,7 @@ hr.section-rule {
 }
 .rtag {
     font-size: 0.63rem; padding: 0.13rem 0.42rem;
-    border-radius: 4px; white-space: nowrap; line-height: 1.5;
+    border-radius: var(--radius); white-space: nowrap; line-height: 1.5;
 }
 .rtag-bg { background: var(--good-dim);    color: var(--good);    }
 .rtag-by { background: var(--warn-dim);    color: var(--warn);    }
@@ -221,8 +223,8 @@ hr.section-rule {
 .step-card {
     background: var(--tint);
     border: 1px solid var(--line);
-    border-radius: 13px;
-    padding: 1.15rem 1.25rem;
+    border-radius: var(--radius);
+    padding: 1.3rem 1.4rem;
     min-height: 7.5rem;
     transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
 }
@@ -233,7 +235,7 @@ hr.section-rule {
 }
 .step-num {
     display: inline-block; width: 1.7rem; height: 1.7rem;
-    border-radius: 50%;
+    border-radius: var(--radius);
     background: linear-gradient(135deg, var(--pink-dim), var(--neutral-dim));
     color: var(--pink);
     font-weight: 700; font-size: 0.8rem; text-align: center; line-height: 1.7rem;
@@ -245,14 +247,14 @@ hr.section-rule {
 /* ── Glossary cards ── */
 .gcard {
     background: var(--tint); border: 1px solid var(--line);
-    border-radius: 12px; padding: 1.2rem 1.4rem;
+    border-radius: var(--radius); padding: 1.35rem 1.5rem;
     box-shadow: 0 1px 4px var(--shadow); margin-bottom: 0.75rem;
 }
 .gcard-term { font-size: 1rem; font-weight: 700; margin-bottom: 0.3rem; }
 .gcard-tag {
     display: inline-block; font-size: 0.65rem; font-weight: 700;
     text-transform: uppercase; letter-spacing: 0.08em;
-    padding: 0.1rem 0.45rem; border-radius: 4px; margin-bottom: 0.6rem;
+    padding: 0.1rem 0.45rem; border-radius: var(--radius); margin-bottom: 0.6rem;
     background: var(--pink-dim); color: var(--pink);
 }
 .gcard-def { font-size: 0.9rem; color: var(--muted); line-height: 1.65; }
