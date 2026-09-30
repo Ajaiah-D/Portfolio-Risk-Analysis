@@ -1,4 +1,9 @@
+import sys
+
 import streamlit as st
+
+sys.path.insert(0, ".")
+from streamlit_app import style
 
 st.set_page_config(
     page_title="Glossary | Portfolio Risk Analysis",
@@ -6,117 +11,10 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-dark = st.session_state.get("dark_mode", False)
-
-if dark:
-    _vars = """
-    --bg:      #0c0c0c; --bg2: #141414; --bg3: #1c1c1c;
-    --text:    #f0f0f0; --text2: #888888; --border: #272727;
-    --card:    #141414; --shadow: rgba(0,0,0,0.35);
-    """
-else:
-    _vars = """
-    --bg:      #ffffff; --bg2: #f7f7f7; --bg3: #eeeeee;
-    --text:    #111111; --text2: #666666; --border: #e5e5e5;
-    --card:    #ffffff; --shadow: rgba(0,0,0,0.06);
-    """
-
-st.markdown(f"""
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-:root {{ {_vars}
-    --pink: #fc88e5; --pink-dim: rgba(252,136,229,0.12);
-    --good: #10b981; --warn: #f59e0b; --risk: #f43f5e;
-}}
-html, body, [class*="css"] {{ font-family: 'Inter', sans-serif; }}
-#MainMenu, footer {{ visibility: hidden; }}
-.block-container {{ padding-top: 2rem; padding-bottom: 3rem; max-width: 900px; }}
-.stApp, [data-testid="stAppViewContainer"], [data-testid="stAppViewContainer"] > section {{
-    background-color: var(--bg) !important;
-}}
-[data-testid="stHeader"] {{ background-color: var(--bg) !important; border-bottom: 1px solid var(--border) !important; }}
-[data-testid="stSidebar"] {{ background-color: var(--bg2) !important; border-right: 1px solid var(--border); }}
-p, span, label, div, h1, h2, h3, h4, li {{ color: var(--text) !important; }}
-
-/* ── Sidebar page navigation — strip Streamlit's light-theme pill
-   backgrounds (resting/hover/current), then restyle with theme colors ── */
-[data-testid="stSidebarNav"],
-[data-testid="stSidebarNav"] ul,
-[data-testid="stSidebarNav"] li,
-[data-testid="stSidebarNav"] li > div,
-[data-testid="stSidebarNav"] a,
-[data-testid="stSidebarNav"] a > div,
-[data-testid="stSidebarNav"] a span {{
-    background-color: transparent !important;
-    color: var(--text) !important;
-}}
-[data-testid="stSidebarNav"] a:hover,
-[data-testid="stSidebarNav"] a:hover > div {{ background-color: var(--bg3) !important; }}
-[data-testid="stSidebarNav"] a:hover span {{ color: var(--pink) !important; }}
-[data-testid="stSidebarNav"] a[aria-current="page"],
-[data-testid="stSidebarNav"] a[aria-current="true"],
-[data-testid="stSidebarNav"] a[aria-current="page"] > div {{ background-color: var(--pink-dim) !important; }}
-[data-testid="stSidebarNav"] a[aria-current="page"] span,
-[data-testid="stSidebarNav"] a[aria-current="true"] span {{ color: var(--pink) !important; }}
-[data-testid="stSidebarNav"] svg {{ color: var(--text2) !important; fill: var(--text2) !important; }}
-[data-testid="stSidebarNavSeparator"] {{ border-color: var(--border) !important; }}
-[data-testid="stSidebarCollapseButton"] button,
-[data-testid="stSidebarCollapseButton"] svg,
-[data-testid="stSidebarCollapsedControl"] button,
-[data-testid="stSidebarCollapsedControl"] svg {{
-    color: var(--text2) !important;
-    fill: var(--text2) !important;
-}}
-
-.hero-title {{ font-size: 2rem; font-weight: 700; color: var(--text); letter-spacing: -0.5px; margin: 0 0 0.35rem 0; }}
-.hero-title span {{ color: var(--pink); }}
-.hero-sub {{ font-size: 0.9rem; color: var(--text2); margin: 0 0 2rem 0; line-height: 1.6; }}
-
-.section-title {{
-    font-size: 0.72rem; font-weight: 700; text-transform: uppercase;
-    letter-spacing: 0.1em; color: var(--pink); margin: 2.4rem 0 0.25rem 0;
-}}
-.section-heading {{
-    font-size: 1.05rem; font-weight: 600; color: var(--text); margin: 0 0 0.8rem 0;
-}}
-hr.section-rule {{ border: none; border-top: 1px solid var(--border); margin: 0.5rem 0 1.2rem 0; }}
-
-.gcard {{
-    background: var(--card); border: 1px solid var(--border);
-    border-radius: 12px; padding: 1.2rem 1.4rem;
-    box-shadow: 0 1px 4px var(--shadow); margin-bottom: 0.75rem;
-}}
-.gcard-term {{
-    font-size: 1rem; font-weight: 700; color: var(--text); margin-bottom: 0.3rem;
-}}
-.gcard-tag {{
-    display: inline-block; font-size: 0.65rem; font-weight: 700;
-    text-transform: uppercase; letter-spacing: 0.08em;
-    padding: 0.1rem 0.45rem; border-radius: 4px; margin-bottom: 0.6rem;
-    background: var(--pink-dim); color: var(--pink);
-}}
-.gcard-def {{ font-size: 0.88rem; color: var(--text2); line-height: 1.65; }}
-.gcard-ex {{
-    font-size: 0.8rem; color: var(--text2); line-height: 1.6;
-    margin-top: 0.6rem; padding-top: 0.6rem;
-    border-top: 1px dashed var(--border);
-    font-style: italic;
-}}
-</style>
-""", unsafe_allow_html=True)
-
-# ── Sidebar ──
-with st.sidebar:
-    toggle_col, _ = st.columns([1, 0.01])
-    with toggle_col:
-        new_dark = st.toggle(
-            "Dark mode",
-            value=st.session_state.get("dark_mode", False),
-            key="dark_toggle",
-        )
-    if new_dark != st.session_state.get("dark_mode", False):
-        st.session_state.dark_mode = new_dark
-        st.rerun()
+# Shared card styles; light/dark itself is Streamlit's native theme.
+style.inject_css()
+# Definitions read better at a narrower measure than the dashboard.
+st.markdown("<style>.block-container { max-width: 1100px; }</style>", unsafe_allow_html=True)
 
 # ── Header ──
 st.markdown('<h1 class="hero-title">Financial <span>Glossary</span></h1>', unsafe_allow_html=True)

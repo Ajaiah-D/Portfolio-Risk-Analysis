@@ -1,6 +1,24 @@
+# Streamlit's native light/dark themes. Defining both [theme.light] and
+# [theme.dark] lets Streamlit paint every widget itself in either mode, and
+# lets visitors switch from the app menu (top-right ⋮ → Light / Dark /
+# System). The default follows the visitor's OS setting. Custom CSS in
+# streamlit_app/style.py only styles the app's own HTML cards, never
+# Streamlit's widgets.
 [theme]
 primaryColor = "#fc88e5"
+font = "Inter:https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap, sans-serif"
+baseRadius = "9px"
+
+[theme.light]
+primaryColor = "#fc88e5"
 backgroundColor = "#ffffff"
-secondaryBackgroundColor = "#f7f7f7"
+secondaryBackgroundColor = "#f5f5f5"
 textColor = "#111111"
-font = "sans serif"
+borderColor = "#e5e5e5"
+
+[theme.dark]
+primaryColor = "#fc88e5"
+backgroundColor = "#0c0c0c"
+secondaryBackgroundColor = "#1a1a1a"
+textColor = "#f0f0f0"
+borderColor = "#2a2a2a"
