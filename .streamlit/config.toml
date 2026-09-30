@@ -7,7 +7,7 @@
 [theme]
 primaryColor = "#fc88e5"
 font = "Inter:https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap, sans-serif"
-baseRadius = "9px"
+baseRadius = "2px"   # near-square corners; keep in sync with --radius in style.py
 
 [theme.light]
 primaryColor = "#fc88e5"
