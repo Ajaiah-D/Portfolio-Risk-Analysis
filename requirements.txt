@@ -1,5 +1,5 @@
 # Core app
-streamlit>=1.47
+streamlit~=1.64.0   # [theme.light]/[theme.dark] native theming; pinned so widget DOM changes arrive deliberately
 plotly>=5.20
 pandas>=2.2
 numpy>=1.26

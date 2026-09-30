@@ -11,7 +11,11 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 import pytest
 from streamlit.testing.v1 import AppTest
 
-APP = "streamlit_app/Portfolio_Analyzer.py"
+ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+# Absolute paths: Streamlit >=1.64 resolves relative AppTest paths against the
+# calling test file, not the working directory.
+APP = os.path.join(ROOT, "streamlit_app", "Portfolio_Analyzer.py")
+GLOSSARY = os.path.join(ROOT, "streamlit_app", "pages", "Glossary.py")
 DB = "data/portfolio_data.db"
 
 pytestmark = pytest.mark.skipif(
@@ -72,7 +76,7 @@ def test_url_prefill_autoruns():
 
 
 def test_glossary_page_renders():
-    at = AppTest.from_file("streamlit_app/pages/Glossary.py", default_timeout=30).run()
+    at = AppTest.from_file(GLOSSARY, default_timeout=30).run()
     assert not at.exception
     all_md = " ".join(str(m.value) for m in at.markdown)
     for term in ("Sharpe Ratio", "Monte Carlo", "Diversification Score", "Rolling Beta"):

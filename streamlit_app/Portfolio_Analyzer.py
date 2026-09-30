@@ -50,12 +50,9 @@ def _ensure_database():
 
 _ensure_database()
 
-# ── Session state defaults ────────────────────────────────────────────────────
-if "dark_mode" not in st.session_state:
-    st.session_state.dark_mode = False
-
-dark = st.session_state.dark_mode
-style.inject_css(dark)
+# Light/dark is Streamlit's native theme (.streamlit/config.toml); this only
+# styles the app's own HTML cards.
+style.inject_css()
 
 # ── Cached data loaders ───────────────────────────────────────────────────────
 @st.cache_data
@@ -164,13 +161,6 @@ st.session_state.setdefault("wmode", EQUAL_MODE)
 st.session_state.setdefault("rfr_pct", 5.0)
 
 with st.sidebar:
-
-    new_dark = st.toggle("Dark mode", value=st.session_state.dark_mode, key="dark_toggle")
-    if new_dark != st.session_state.dark_mode:
-        st.session_state.dark_mode = new_dark
-        st.rerun()
-
-    st.markdown('<div class="sb-gap"></div>', unsafe_allow_html=True)
 
     # ── Holdings — one search box for everything ──
     st.markdown('<span class="sb-label">Build Your Portfolio</span>', unsafe_allow_html=True)
@@ -342,6 +332,7 @@ with st.sidebar:
     st.markdown('<div class="sb-gap"></div>', unsafe_allow_html=True)
     run_btn = st.button("Run Analysis", width="stretch", type="primary")
     st.caption("After running, your setup is saved in the page URL. Copy it from the address bar to share or bookmark.")
+    st.caption("Light or dark mode: open the ⋮ menu (top right) and pick Light, Dark, or System (matches your device).")
 
 # ── Dates ─────────────────────────────────────────────────────────────────────
 _days   = {"1Y": 365, "3Y": 1095, "5Y": 1825, "10Y": 3650}
@@ -462,7 +453,7 @@ with st.spinner("Fetching data and computing metrics…"):
 # Deriving the key from the inputs forces a clean remount on every change.
 _data_sig = hashlib.md5(
     f"{time_horizon}|{rfr_pct}|{','.join(sorted(held))}|{portfolio_value}"
-    f"|{weighting_desc}|{sorted(weights_map.items())}|{dark}".encode()
+    f"|{weighting_desc}|{sorted(weights_map.items())}".encode()
 ).hexdigest()[:10]
 
 # ── Persist setup in the URL (share / bookmark) ───────────────────────────────
@@ -586,7 +577,7 @@ with tab_overview:
 with tab_perf:
     _section("Performance", "Cumulative Returns",
              "Growth of the period. The bold line is your weighted portfolio, the dotted line is SPY. Hover to compare values.")
-    st.plotly_chart(charts.build_cumulative_chart(df, weights_map, dark=dark), width="stretch", key=f"ch_cum_{_data_sig}")
+    st.plotly_chart(charts.build_cumulative_chart(df, weights_map), width="stretch", key=f"ch_cum_{_data_sig}")
 
     _section("Breakdown", "Asset Metrics",
              "Per-holding risk and return over the selected period. SPY is the benchmark, so Beta, Sharpe, and Sortino are measured against it. "
@@ -595,24 +586,24 @@ with tab_perf:
 
     _section("Composition", "Sector Exposure",
              "Where your money sits across GICS sectors, using your current weights. ETFs and funds without a sector are grouped as Other / ETF.")
-    st.plotly_chart(charts.build_sector_chart(df, weights_map, dark=dark), width="stretch", key=f"ch_sector_perf_{_data_sig}")
+    st.plotly_chart(charts.build_sector_chart(df, weights_map), width="stretch", key=f"ch_sector_perf_{_data_sig}")
 
 # ═══ RISK ═════════════════════════════════════════════════════════════════════
 with tab_risk:
     _section("Drawdowns", "Underwater Chart",
              "How far below its previous peak the portfolio was at every point in time. "
              "Depth shows how bad losses got; width shows how long recovery took.")
-    st.plotly_chart(charts.build_underwater_chart(port_r_series, dark=dark), width="stretch", key=f"ch_underwater_{_data_sig}")
+    st.plotly_chart(charts.build_underwater_chart(port_r_series), width="stretch", key=f"ch_underwater_{_data_sig}")
 
     _rc1, _rc2 = st.columns(2)
     with _rc1:
         _section("Volatility Over Time", "Rolling Volatility",
                  "Risk isn't constant. This shows when your portfolio was calm and when it was rough, next to SPY.")
-        st.plotly_chart(charts.build_rolling_vol_chart(port_r_series, bench_r, dark=dark), width="stretch", key=f"ch_rvol_{_data_sig}")
+        st.plotly_chart(charts.build_rolling_vol_chart(port_r_series, bench_r), width="stretch", key=f"ch_rvol_{_data_sig}")
     with _rc2:
         _section("Market Sensitivity", "Rolling Beta",
                  "How strongly your portfolio tracked the market over time. Above 1 = amplifies market moves; below 1 = defensive.")
-        st.plotly_chart(charts.build_rolling_beta_chart(port_r_series, bench_r, dark=dark), width="stretch", key=f"ch_rbeta_{_data_sig}")
+        st.plotly_chart(charts.build_rolling_beta_chart(port_r_series, bench_r), width="stretch", key=f"ch_rbeta_{_data_sig}")
 
 # ═══ DIVERSIFICATION ══════════════════════════════════════════════════════════
 with tab_div:
@@ -629,7 +620,7 @@ with tab_div:
             unsafe_allow_html=True,
         )
     with _dc2:
-        st.plotly_chart(charts.build_sector_chart(df, weights_map, dark=dark), width="stretch", key=f"ch_sector_div_{_data_sig}")
+        st.plotly_chart(charts.build_sector_chart(df, weights_map), width="stretch", key=f"ch_sector_div_{_data_sig}")
 
     _section("Correlations", "Correlation Matrix",
              "How closely each holding moves with the others. "
@@ -688,7 +679,7 @@ with tab_whatif:
             "Max Sharpe": (opt["max_sharpe"]["vol"] * 100, opt["max_sharpe"]["ret"] * 100),
             "Min Volatility": (opt["min_vol"]["vol"] * 100, opt["min_vol"]["ret"] * 100),
         }
-    frontier_fig = charts.build_frontier_chart(df, weights_map, rfr=rfr, dark=dark, opt_points=_opt_points)
+    frontier_fig = charts.build_frontier_chart(df, weights_map, rfr=rfr, opt_points=_opt_points)
     if frontier_fig:
         st.plotly_chart(frontier_fig, width="stretch", key=f"ch_frontier_{_data_sig}")
     else:
@@ -749,7 +740,7 @@ with tab_whatif:
                 )
 
         st.plotly_chart(
-            charts.build_sector_chart(df, _slider_weights, dark=dark),
+            charts.build_sector_chart(df, _slider_weights),
             width="stretch", key=f"ch_sector_whatif_{_data_sig}_{_whatif_sig}",
         )
 
@@ -780,7 +771,7 @@ with tab_plan:
             _mc_years = st.slider("Time horizon (years)", 1, 30, 10)
 
         _mc_fig, _prob, _med, _p10, _p90 = charts.build_monte_carlo(
-            port_r_series, portfolio_value, _target_value, _mc_years, dark=dark
+            port_r_series, portfolio_value, _target_value, _mc_years
         )
         st.plotly_chart(_mc_fig, width="stretch", key=f"ch_mc_{_data_sig}_{_mc_years}_{int(_target_value)}")
 
