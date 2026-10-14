@@ -24,7 +24,7 @@ from datetime import date, timedelta
 
 sys.path.insert(0, ".")
 from scripts.fetch_data import fetch_prices
-from scripts.store_data import store_prices
+from scripts.store_data import insert_prices
 
 # ── Config ────────────────────────────────────────────────────────────────────
 DB_PATH        = "data/portfolio_data.db"
@@ -60,25 +60,9 @@ def already_covered(earliest_in_db: str) -> bool:
 
 
 def insert_without_duplicates(df):
-    """Store prices using INSERT OR IGNORE — skips any (ticker, date) that already exists."""
-    if df.empty:
-        return 0
-    conn = sqlite3.connect(DB_PATH)
-    cur  = conn.cursor()
-    rows = [
-        (str(row["date"]), row["open"], row["high"],
-         row["low"], row["close"], row["volume"], row["ticker"])
-        for _, row in df.iterrows()
-    ]
-    cur.executemany(
-        "INSERT OR IGNORE INTO daily_prices "
-        "(date, open, high, low, close, volume, ticker) VALUES (?,?,?,?,?,?,?)",
-        rows,
-    )
-    inserted = cur.rowcount
-    conn.commit()
-    conn.close()
-    return inserted
+    """Insert via the shared path: ensures the schema exists and skips any
+    (ticker, date) already stored."""
+    return insert_prices(df, DB_PATH)
 
 
 def run_backfill():

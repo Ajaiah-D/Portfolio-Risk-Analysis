@@ -1,6 +1,10 @@
 import datetime
+import os
+import sys
 
 import pandas as pd
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from scripts.fetch_data import fetch_prices, fetch_ticker_metadata
 from scripts.store_data import store_prices, store_metadata
 

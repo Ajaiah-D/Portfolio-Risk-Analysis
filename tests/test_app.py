@@ -137,3 +137,17 @@ def test_budget_mode_equal_start(monkeypatch=None):
     assert set(amounts) == {"AAPL", "MSFT", "JNJ", "XOM"}
     assert sum(amounts.values()) == pytest.approx(5.0, abs=0.01)
     assert all(abs(v - 1.25) < 0.011 for v in amounts.values())
+
+
+def test_delisted_holding_blocks_analysis_with_explanation():
+    at = make_app()
+    at.query_params["t"] = "AAPL,WBA"
+    at.run()
+    assert not at.exception
+    assert len(at.tabs) == 0, "analysis must not run with a delisted holding"
+    message = " ".join(str(e.value) for e in at.error)
+    assert "can't be analysed" in message
+    assert "WBA" in message and "delisted" in message
+    # the picker labels it too, so the user is warned before running
+    labels = at.multiselect(key="holdings_sel").options
+    assert any(o.startswith("WBA") and "delisted" in o for o in labels)

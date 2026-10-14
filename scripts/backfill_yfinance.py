@@ -13,6 +13,7 @@ Monitor:
     CMD:         more +0 data\backfill_yf.log  (then keep re-running)
 """
 
+import os
 import sys
 import sqlite3
 import time
@@ -21,6 +22,9 @@ from datetime import date, timedelta
 
 import yfinance as yf
 import pandas as pd
+
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from scripts.store_data import insert_prices
 
 DB_PATH      = "data/portfolio_data.db"
 LOG_PATH     = "data/backfill_yf.log"
@@ -48,24 +52,9 @@ def get_coverage():
 
 
 def insert(df):
-    if df.empty:
-        return 0
-    conn = sqlite3.connect(DB_PATH)
-    cur  = conn.cursor()
-    rows = [
-        (str(r["date"]), r["open"], r["high"], r["low"],
-         r["close"], r["volume"], r["ticker"])
-        for _, r in df.iterrows()
-    ]
-    cur.executemany(
-        "INSERT OR IGNORE INTO daily_prices "
-        "(date, open, high, low, close, volume, ticker) VALUES (?,?,?,?,?,?,?)",
-        rows,
-    )
-    n = cur.rowcount
-    conn.commit()
-    conn.close()
-    return n
+    """Insert via the shared path: ensures the schema exists and skips any
+    (ticker, date) already stored."""
+    return insert_prices(df, DB_PATH)
 
 
 def fetch_yf(ticker, start, end):
