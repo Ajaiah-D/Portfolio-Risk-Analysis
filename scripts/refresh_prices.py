@@ -34,8 +34,8 @@ import yfinance as yf
 import pandas as pd
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from scripts.store_data import insert_prices, replace_ticker_history, validate_prices
-from scripts.symbols import load_delisted, yahoo_symbol
+from scripts.store_data import insert_prices, replace_ticker_history, trim_after, validate_prices
+from scripts.symbols import load_delisted, load_last_valid_dates, yahoo_symbol
 
 DB_PATH  = "data/portfolio_data.db"
 LOG_PATH = "data/refresh.log"
@@ -192,7 +192,8 @@ def restate_ticker(ticker, fetch_end, max_date):
 def run(today=None):
     """Bring every ticker up to yesterday.
 
-    Returns {"inserted": row_count, "restated": [tickers], "refused": [tickers]}.
+    Returns {"inserted": rows, "restated": [tickers], "refused": [tickers],
+             "trimmed": {ticker: rows_removed}}.
     `today` is injectable for tests; it defaults to the current date.
     """
     today     = today or date.today()
@@ -204,7 +205,14 @@ def run(today=None):
     # stored.
     fetch_end = today.strftime("%Y-%m-%d")
     delisted  = load_delisted()
-    summary   = {"inserted": 0, "restated": [], "refused": []}
+    summary   = {"inserted": 0, "restated": [], "refused": [], "trimmed": {}}
+
+    # Remove rows the delisted list marks as invalid (idempotent).
+    for ticker, last_valid in load_last_valid_dates().items():
+        n = trim_after(ticker, last_valid, DB_PATH)
+        if n:
+            summary["trimmed"][ticker] = n
+            log.warning(f"{ticker}: removed {n} rows after its last valid date {last_valid}")
 
     to_update = sorted(
         (ticker, latest_date, close)

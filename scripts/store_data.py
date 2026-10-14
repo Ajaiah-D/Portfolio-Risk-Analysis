@@ -112,6 +112,21 @@ def replace_ticker_history(df, ticker, db_path=None):
     return deleted, len(rows)
 
 
+def trim_after(ticker, last_valid_date, db_path=None):
+    """Delete a ticker's rows dated after `last_valid_date`. Returns the
+    number deleted; a no-op once the bad rows are gone."""
+    conn = sqlite3.connect(db_path or DB_PATH)
+    try:
+        ensure_schema(conn)
+        with conn:
+            return conn.execute(
+                "DELETE FROM daily_prices WHERE ticker = ? AND date > ?",
+                (ticker, str(last_valid_date)),
+            ).rowcount
+    finally:
+        conn.close()
+
+
 def store_prices(df):
     """
     Store daily price data in the daily_prices table.

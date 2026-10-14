@@ -266,7 +266,7 @@ class TestRefresh:
 
         # start is the latest stored date (the anchor bar); end is today, exclusive
         assert fake.calls == [("AAA", "2026-10-09", "2026-10-13")]
-        assert result == {"inserted": 1, "restated": [], "refused": []}
+        assert result == {"inserted": 1, "restated": [], "refused": [], "trimmed": {}}
         assert refresh_prices.get_latest_dates() == {"AAA": "2026-10-12"}
 
     def test_never_stores_today_even_if_source_returns_it(self, refresh_db, monkeypatch):
@@ -306,7 +306,7 @@ class TestRefresh:
         # Fri 10-09 is stored. Sat/Sun/Mon runs have no completed trading day to add.
         seed(refresh_db, "AAA", "2026-10-09")
         monkeypatch.setattr(refresh_prices, "fetch_yf", FakeYahoo())
-        assert refresh_prices.run(today=today) == {"inserted": 0, "restated": [], "refused": []}
+        assert refresh_prices.run(today=today) == {"inserted": 0, "restated": [], "refused": [], "trimmed": {}}
         assert refresh_prices.get_latest_dates() == {"AAA": "2026-10-09"}
 
     def test_fetch_window_is_never_inverted(self, refresh_db, monkeypatch):
@@ -713,7 +713,7 @@ class TestRefreshRestatement:
 
         result = refresh_prices.run(today=TODAY)
 
-        assert result == {"inserted": 0, "restated": ["AAA"], "refused": []}
+        assert result == {"inserted": 0, "restated": ["AAA"], "refused": [], "trimmed": {}}
         stored = rows(refresh_db)
         assert [r[1] for r in stored] == HIST_DAYS
         assert [r[2] for r in stored] == pytest.approx(truth)
@@ -738,7 +738,7 @@ class TestRefreshRestatement:
         self._store(refresh_db, "AAA", truth[:50])
         source = Source(AAA=truth)
         monkeypatch.setattr(refresh_prices, "fetch_yf", source)
-        assert refresh_prices.run(today=TODAY) == {"inserted": 1, "restated": [], "refused": []}
+        assert refresh_prices.run(today=TODAY) == {"inserted": 1, "restated": [], "refused": [], "trimmed": {}}
         assert len(source.calls) == 1                           # no full-history download
 
     def test_reused_symbol_is_refused_and_nothing_is_stored(self, refresh_db, monkeypatch):
@@ -749,7 +749,7 @@ class TestRefreshRestatement:
 
         result = refresh_prices.run(today=TODAY)
 
-        assert result == {"inserted": 0, "restated": [], "refused": ["AAA"]}
+        assert result == {"inserted": 0, "restated": [], "refused": ["AAA"], "trimmed": {}}
         assert rows(refresh_db) == before
 
     def test_one_restatement_does_not_disturb_other_tickers(self, refresh_db, monkeypatch):
@@ -757,7 +757,7 @@ class TestRefreshRestatement:
         self._store(refresh_db, "AAA", a[:50] * 4)
         self._store(refresh_db, "BBB", b[:50])
         monkeypatch.setattr(refresh_prices, "fetch_yf", Source(AAA=a, BBB=b))
-        assert refresh_prices.run(today=TODAY) == {"inserted": 1, "restated": ["AAA"], "refused": []}
+        assert refresh_prices.run(today=TODAY) == {"inserted": 1, "restated": ["AAA"], "refused": [], "trimmed": {}}
         assert [r[2] for r in rows(refresh_db) if r[0] == "BBB"] == pytest.approx(b)
 
     def test_second_run_after_restatement_changes_nothing(self, refresh_db, monkeypatch):
@@ -766,7 +766,7 @@ class TestRefreshRestatement:
         monkeypatch.setattr(refresh_prices, "fetch_yf", Source(AAA=truth))
         refresh_prices.run(today=TODAY)
         before = rows(refresh_db)
-        assert refresh_prices.run(today=TODAY) == {"inserted": 0, "restated": [], "refused": []}
+        assert refresh_prices.run(today=TODAY) == {"inserted": 0, "restated": [], "refused": [], "trimmed": {}}
         assert rows(refresh_db) == before
 
 
@@ -812,7 +812,7 @@ class TestSymbols:
     def test_repo_delisted_file_is_well_formed(self):
         with open(symbols.DELISTED_PATH, encoding="utf-8") as f:
             lines = [l.strip() for l in f if l.strip()]
-        assert lines[0] == "ticker,reason"
+        assert lines[0] == "ticker,reason,last_valid_date"
         tickers = [l.split(",")[0] for l in lines[1:]]
         assert tickers and len(tickers) == len(set(tickers))
         assert all(l.split(",", 1)[1] for l in lines[1:]), "every entry needs a reason"
@@ -844,3 +844,41 @@ class TestFindEndedTickers:
 
     def test_no_benchmark_means_no_verdict(self):
         assert helpers.find_ended_tickers(self._df(AAA=51, GONE=30), ["AAA", "GONE"]) == {}
+
+
+# ── Trimming rows a delisted symbol's successor wrote ─────────────────────────
+class TestTrimAfterLastValidDate:
+    def test_trim_removes_only_later_rows_for_that_ticker(self, db):
+        store_data.insert_prices(bars("OLD", ["2026-01-02", "2026-01-05", "2026-01-06"]), db)
+        store_data.insert_prices(bars("KEEP", ["2026-01-06"]), db)
+        assert store_data.trim_after("OLD", "2026-01-02", db) == 2
+        assert rows(db) == [("KEEP", "2026-01-06", 100.0), ("OLD", "2026-01-02", 100.0)]
+
+    def test_trim_is_idempotent(self, db):
+        store_data.insert_prices(bars("OLD", ["2026-01-02", "2026-01-05"]), db)
+        store_data.trim_after("OLD", "2026-01-02", db)
+        assert store_data.trim_after("OLD", "2026-01-02", db) == 0
+
+    def test_refresh_trims_listed_tickers_and_reports_it(self, refresh_db, monkeypatch):
+        seed(refresh_db, "AAA", "2026-10-12")
+        seed(refresh_db, "PARA", "2026-10-12")
+        monkeypatch.setattr(refresh_prices, "fetch_yf", FakeYahoo())
+        monkeypatch.setattr(refresh_prices, "load_delisted", lambda: {"PARA": "reused"})
+        monkeypatch.setattr(refresh_prices, "load_last_valid_dates", lambda: {"PARA": "2026-10-08"})
+
+        result = refresh_prices.run(today=TODAY)
+
+        assert result["trimmed"] == {"PARA": 2}
+        assert refresh_prices.get_latest_dates() == {"AAA": "2026-10-12", "PARA": "2026-10-08"}
+        assert refresh_prices.run(today=TODAY)["trimmed"] == {}
+
+    def test_load_last_valid_dates_ignores_blank_entries(self, tmp_path):
+        f = tmp_path / "d.csv"
+        f.write_text("ticker,reason,last_valid_date\nPARA,reused,2025-07-18\nWBA,private,\n")
+        assert symbols.load_last_valid_dates(str(f)) == {"PARA": "2025-07-18"}
+        assert symbols.load_delisted(str(f)) == {"PARA": "reused", "WBA": "private"}
+
+    def test_two_column_file_still_loads(self, tmp_path):
+        f = tmp_path / "d.csv"
+        f.write_text("ticker,reason\nWBA,private\n")
+        assert symbols.load_last_valid_dates(str(f)) == {}
