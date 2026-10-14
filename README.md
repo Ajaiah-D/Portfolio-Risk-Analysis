@@ -40,6 +40,8 @@ SQLite ──► data/helpers.py ──► metrics/ (core, optimize, allocation)
                        streamlit_app/ (Portfolio_Analyzer + charts, insights, interpret, style)
 ```
 
+A diagram of the full system is in docs/architecture.excalidraw (open it at excalidraw.com).
+
 Data is ingested once and refreshed forward daily. The Streamlit app itself never calls a live pricing API — it only reads SQLite. On Streamlit Cloud, where the database can't be committed to git, the app downloads it once per cold start from the same GitHub Release the automation keeps fresh, then behaves identically to a local run.
 
 | Module | Responsibility |
