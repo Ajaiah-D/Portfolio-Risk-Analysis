@@ -6,7 +6,12 @@ name: Refresh Price Data
 on:
   schedule:
     - cron: "0 11 * * 1-5"
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      rebuild_history:
+        description: "Re-download full history for every non-delisted ticker before refreshing (one-time repair; ~10 min)"
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -70,6 +75,12 @@ jobs:
             }
           fi
 
+      # Manual only. Tickers it can't safely replace keep their stored data and
+      # are listed in the log; the validation step below reports anything left.
+      - name: Rebuild full price history
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.rebuild_history }}
+        run: python scripts/rebuild_history.py || echo "::warning::Some tickers were not rebuilt; see the log above."
+
       - name: Refresh prices forward
         run: python scripts/refresh_prices.py
 
@@ -101,3 +112,12 @@ jobs:
             git commit -m "chore: update data freshness metadata [skip ci]"
             git push
           fi
+
+      # Runs last on purpose: the refreshed data is already saved, so this is an
+      # alarm, not a gate. A red run means the data needs a human to look:
+      # duplicates or bad prices, a ticker that stopped updating without being
+      # listed in tickers/delisted.csv, nothing newer than 4 days old (which
+      # also covers weekends and one-day market holidays), or a split-sized move
+      # in the last 30 days.
+      - name: Validate data
+        run: python scripts/validate_data.py --max-age-days 4 --recent-jump-days 30

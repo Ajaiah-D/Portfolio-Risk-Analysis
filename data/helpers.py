@@ -39,3 +39,18 @@ def get_price_data(tickers, start_date, end_date):
     df = df.dropna(subset=['close'])
 
     return df[['date', 'ticker', 'close', 'name', 'sector']]
+
+
+def find_ended_tickers(df, tickers, benchmark="SPY", grace_days=7):
+    """Return {ticker: last_date} for tickers whose prices stop more than
+    `grace_days` before the benchmark's last date in `df`.
+
+    Returns are computed on forward-filled prices, so a ticker that stopped
+    trading would otherwise be analysed as a flat line (0% every day) from its
+    last price onward, quietly understating risk for the whole portfolio.
+    """
+    last = df.groupby("ticker")["date"].max()
+    if benchmark not in last.index:
+        return {}
+    cutoff = last[benchmark] - pd.Timedelta(days=grace_days)
+    return {t: last[t].date() for t in tickers if t in last.index and last[t] < cutoff}

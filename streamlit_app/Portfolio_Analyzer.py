@@ -12,6 +12,7 @@ import streamlit as st
 sys.path.insert(0, ".")
 from data import helpers
 from metrics import core, optimize
+from scripts.symbols import load_delisted
 from streamlit_app import allocation, charts, insights, interpret, style
 from streamlit_app.interpret import metric_card_html, style_asset_table, corr_cell_css
 
@@ -24,7 +25,7 @@ st.set_page_config(
 )
 
 # ── Bootstrap the price database on hosted deploys ───────────────────────────
-# The DB is gitignored (95MB+, too large for GitHub), so a fresh Streamlit
+# The DB is gitignored (too large for GitHub and growing daily), so a fresh Streamlit
 # Cloud container starts with no database at all. If it's missing, pull the
 # rolling seed backup that scripts/refresh_prices.py + GitHub Actions keeps
 # updated daily (see .github/workflows/refresh_data.yml). No-op locally where
@@ -40,7 +41,7 @@ def _ensure_database():
     if os.path.exists(DB_PATH) and os.path.getsize(DB_PATH) > 0:
         return
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
-    with st.spinner("First-time setup: downloading price data (~95MB, one time per session)…"):
+    with st.spinner("First-time setup: downloading price data (one time per session)…"):
         try:
             urllib.request.urlretrieve(DB_SEED_URL, DB_PATH)
         except Exception as e:
@@ -59,17 +60,26 @@ style.inject_css()
 def load_universe():
     """Load S&P 500 constituents + ETF list from DB, merged with GICS sectors."""
     conn = sqlite3.connect("data/portfolio_data.db")
-    db_tickers = set(
-        pd.read_sql("SELECT DISTINCT ticker FROM daily_prices", conn)["ticker"]
-    )
+    last_dates = pd.read_sql(
+        "SELECT ticker, MAX(date) AS last_date FROM daily_prices GROUP BY ticker", conn
+    ).set_index("ticker")["last_date"].to_dict()
+    db_tickers = set(last_dates)
     meta = pd.read_sql("SELECT DISTINCT ticker, name FROM tickers_meta", conn)
     conn.close()
     meta_dict = dict(zip(meta["ticker"], meta["name"]))
 
+    # Delisted tickers stay selectable so the label can say why they can't be
+    # analysed; the portfolio check further down refuses to run with them.
+    delisted = load_delisted()
+
+    def _suffix(sym):
+        return f"  (delisted, data ends {last_dates[sym]})" if sym in delisted else ""
+
     # S&P 500 with GICS sectors
     const = pd.read_csv("tickers/constituents.csv")[["Symbol", "Security", "GICS Sector"]]
     const = const[const["Symbol"].isin(db_tickers)].copy()
-    const["label"] = const["Symbol"] + "  —  " + const["Security"]
+    const["label"] = (const["Symbol"] + "  —  " + const["Security"]
+                      + const["Symbol"].map(_suffix))
     const = const.sort_values("Symbol").reset_index(drop=True)
 
     # ETFs (in DB but not S&P 500). SPY is offered too — it's always the
@@ -78,7 +88,7 @@ def load_universe():
     etf_rows = []
     for sym in sorted(db_tickers - sp500_syms):
         name = meta_dict.get(sym, sym)
-        label = f"{sym}  —  {name}" if name and name != sym else sym
+        label = (f"{sym}  —  {name}" if name and name != sym else sym) + _suffix(sym)
         etf_rows.append({"symbol": sym, "label": label})
     etfs = pd.DataFrame(etf_rows)
 
@@ -96,7 +106,8 @@ _HORIZON_DISPLAY = {"1Y": "1 Year", "3Y": "3 Years", "5Y": "5 Years", "10Y": "10
 
 
 def extract_symbol(label):
-    return label.split("  —  ")[0].strip()
+    # Labels are "SYM  —  Name  (note)"; symbols never contain spaces.
+    return label.split("  ")[0].strip()
 
 
 # ── URL prefill (shareable portfolios) ────────────────────────────────────────
@@ -404,6 +415,28 @@ with st.spinner("Fetching data and computing metrics…"):
 
     if not held:
         st.error("None of the selected tickers have data for this period.")
+        st.stop()
+
+    # A ticker whose prices stop before the analysis period ends would be
+    # forward-filled as a flat line, so refuse the portfolio and say why.
+    ended = helpers.find_ended_tickers(df, held)
+    if ended:
+        _period_end = df["date"].max().date()
+        _delisted = load_delisted()
+        _lines = "\n".join(
+            f"- **{t}** has no price data after **{d}**"
+            + (" (delisted)." if t in _delisted else ".")
+            for t, d in sorted(ended.items())
+        )
+        st.error(
+            "**This portfolio can't be analysed as selected.**\n\n"
+            f"{_lines}\n\n"
+            f"The analysis period runs to {_period_end}. Past its last price, a holding "
+            "would be treated as flat (0% every day), which would understate the "
+            "portfolio's risk and distort every metric. Remove "
+            f"{', '.join(sorted(ended))} from your holdings to continue.",
+            icon="⚠️",
+        )
         st.stop()
 
     # ── Weights: the user's actual portfolio ──
