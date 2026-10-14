@@ -21,8 +21,20 @@ def load_delisted(path=None):
     refresh is a decision someone should review, not something the pipeline
     should infer from one failed download.
     """
+    return {t: row.get("reason", "") for t, row in _read(path).items()}
+
+
+def load_last_valid_dates(path=None):
+    """Return {ticker: 'YYYY-MM-DD'} for delisted tickers whose stored rows
+    after that date are known to be wrong (e.g. the symbol was reused by a
+    different security and the old refresh appended its prices)."""
+    return {t: row["last_valid_date"] for t, row in _read(path).items()
+            if (row.get("last_valid_date") or "").strip()}
+
+
+def _read(path=None):
     path = path or DELISTED_PATH
     if not os.path.exists(path):
         return {}
     with open(path, newline="", encoding="utf-8") as f:
-        return {row["ticker"]: row.get("reason", "") for row in csv.DictReader(f)}
+        return {row["ticker"]: row for row in csv.DictReader(f)}

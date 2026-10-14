@@ -1,15 +1,15 @@
-ticker,reason
-DAY,No price data from the source under this symbol
-FI,No price data from the source under this symbol
-HOLX,No price data from the source under this symbol
-IPG,No price data from the source under this symbol
-K,No price data from the source under this symbol
-MMC,No price data from the source under this symbol
-WBA,No price data from the source under this symbol
-CTRA,No price data from the source under this symbol
-BK,No price data from the source under this symbol
-PARA,Symbol now refers to a different security at the source
-AVB,No price data from the source after its last trading day
-EA,No price data from the source after its last trading day
-EQR,No price data from the source after its last trading day
-WBD,No price data from the source after its last trading day
+ticker,reason,last_valid_date
+DAY,No price data from the source under this symbol,
+FI,No price data from the source under this symbol,
+HOLX,No price data from the source under this symbol,
+IPG,No price data from the source under this symbol,
+K,No price data from the source under this symbol,
+MMC,No price data from the source under this symbol,
+WBA,No price data from the source under this symbol,
+CTRA,No price data from the source under this symbol,
+BK,No price data from the source under this symbol,
+PARA,Symbol now refers to a different security at the source; rows after its last valid date were that security,2025-07-18
+AVB,No price data from the source after its last trading day,
+EA,No price data from the source after its last trading day,
+EQR,No price data from the source after its last trading day,
+WBD,No price data from the source after its last trading day,
