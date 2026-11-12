@@ -118,7 +118,7 @@ All prices are split- and dividend-adjusted closes, so every return in the app i
 
 **Known data limitations:**
 
-- **Delisted tickers can't be analysed.** 14 symbols (see `tickers/delisted.csv`) have no price feed after their last trading day. Some may have been renamed rather than delisted; the S&P 500 constituents list hasn't been refreshed to pick up new symbols.
+- **Delisted tickers can't be analysed.** 15 symbols (see `tickers/delisted.csv`) have no price feed after their last trading day. Some may have been renamed rather than delisted; the S&P 500 constituents list hasn't been refreshed to pick up new symbols.
 - **History for delisted tickers predates the repair.** They had no fresh download to restate from, so their stored history may still mix adjustment bases at the 2023-07-31 batch boundary (a small one-day error for dividend payers).
 - **Sector labels in the exposure chart are SIC descriptions** from Massive.com, not the GICS sectors used by the sidebar filter.
 - **Universe is today's S&P 500**, so long horizons carry survivorship bias: companies that left the index aren't offered.
