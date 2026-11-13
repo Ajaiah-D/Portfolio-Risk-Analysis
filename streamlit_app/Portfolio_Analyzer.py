@@ -676,7 +676,7 @@ with tab_whatif:
         _opt_rows = [
             ("Your Portfolio", cur_stats, ""),
             ("Max Sharpe", opt["max_sharpe"], "bg"),
-            ("Min Volatility", opt["min_vol"], "bb"),
+            ("Min Volatility", opt["min_vol"], "by"),   # matches the amber frontier marker
         ]
         for col, (lbl, s, cls) in zip(_oc, _opt_rows):
             with col:
@@ -697,14 +697,14 @@ with tab_whatif:
         st.dataframe(
             _reb.style.format("{:+.1%}", subset=["Shift to Max Sharpe"])
                 .format("{:.1%}", subset=["Current", "Max Sharpe", "Min Volatility"])
-                .map(lambda v: "color: #10b981" if v > 0.005 else ("color: #f43f5e" if v < -0.005 else "color: #888888"),
+                .map(lambda v: "color: #16a34a" if v > 0.005 else ("color: #dc2626" if v < -0.005 else "color: #888888"),
                      subset=["Shift to Max Sharpe"]),
             width="stretch",
         )
 
     _section("Risk vs. Return", "Efficient Frontier",
-             "Each dot is one of 2,500 randomly weighted combinations of your holdings, coloured by Sharpe ratio (pink = higher). "
-             "The star is your portfolio; the green and violet markers are the optimizer's reference mixes. "
+             "Each dot is one of 2,500 randomly weighted combinations of your holdings, coloured by Sharpe ratio (darker blue = higher). "
+             "The star is your portfolio; the green and amber markers are the optimizer's reference mixes. "
              "Portfolios toward the <b>upper-left</b> are best: higher return for less risk.")
     _opt_points = None
     if opt is not None:

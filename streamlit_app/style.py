@@ -26,9 +26,13 @@ _CSS = """
     /* Near-square corners everywhere; matches baseRadius in config.toml. */
     --radius: 2px;
 
-    /* Accents: mid-tones that hold contrast on both backgrounds. */
-    --pink:       #fc88e5;
-    --pink-dim:   rgba(252,136,229,0.14);
+    /* Wine accent for the app's own chrome (labels, borders, chips, badges).
+       It is never a data colour: charts use indigo (see charts.py). Per-mode
+       values match primaryColor in .streamlit/config.toml; light-dark()
+       resolves against the color-scheme Streamlit sets for the active theme,
+       and browsers without it keep the plain values set here. */
+    --accent:     #db2777;
+    --accent-dim: rgba(219,39,119,0.12);
     --good:       #10b981;
     --good-dim:   rgba(16,185,129,0.14);
     --warn:       #f59e0b;
@@ -37,6 +41,18 @@ _CSS = """
     --risk-dim:   rgba(244,63,94,0.14);
     --neutral:    #8b8cf8;
     --neutral-dim:rgba(139,140,248,0.14);
+    /* Gains and losses (Total Return / Volatility vs SPY): darker green and
+       red than the status colours, so the text keeps its contrast. */
+    --up:         #16a34a;
+    --down:       #dc2626;
+}
+@supports (color: light-dark(#000, #fff)) {
+    :root {
+        --accent:     light-dark(#9d174d, #e0789f);
+        --accent-dim: light-dark(rgba(157,23,77,0.10), rgba(224,120,159,0.16));
+        --up:         light-dark(#15803d, #22c55e);
+        --down:       light-dark(#b91c1c, #f87171);
+    }
 }
 
 /* ── Page width ──
@@ -70,13 +86,7 @@ _CSS = """
     font-size: 2.3rem; font-weight: 700;
     letter-spacing: -0.8px; margin: 0 0 0.35rem 0; padding: 0;
 }
-.hero-title span {
-    background: linear-gradient(92deg, var(--pink) 20%, var(--neutral) 100%);
-    -webkit-background-clip: text;
-    background-clip: text;
-    -webkit-text-fill-color: transparent;
-    color: var(--pink); /* fallback */
-}
+.hero-title span { color: var(--accent); }
 .hero-sub {
     font-size: 0.95rem; color: var(--muted);
     margin: 0 0 1.6rem 0; line-height: 1.65; max-width: 52rem;
@@ -86,7 +96,7 @@ _CSS = """
 .section-title {
     font-size: 0.72rem; font-weight: 700;
     text-transform: uppercase; letter-spacing: 0.1em;
-    color: var(--pink);
+    color: var(--accent);
     margin: 2.4rem 0 0.25rem 0;
 }
 .section-heading {
@@ -105,7 +115,7 @@ hr.section-rule {
 .info-bar {
     background: var(--tint);
     border: 1px solid var(--line);
-    border-left: 3px solid var(--pink);
+    border-left: 3px solid var(--accent);
     border-radius: var(--radius);
     padding: 1rem 1.25rem;
     margin-bottom: 1.6rem;
@@ -149,7 +159,7 @@ hr.section-rule {
 .scard:hover, .mcard:hover {
     transform: translateY(-2px);
     box-shadow: 0 6px 18px var(--shadow);
-    border-color: var(--pink);
+    border-color: var(--accent);
 }
 .scard-label {
     font-size: 0.63rem; font-weight: 700;
@@ -164,11 +174,11 @@ hr.section-rule {
     font-size: 0.74rem; color: var(--muted); margin-top: 0.2rem;
 }
 .scard-sub b { font-weight: 600; }
-/* Optimizer scorecards reuse badge classes (.bg/.bb) for their value color;
+/* Optimizer scorecards reuse badge classes (.bg/.by/.bb) for their value color;
    keep the color but drop the badge's tinted background. */
-.scard-val.bg, .scard-val.bb { background: none; }
-.pos { color: var(--good) !important; }
-.neg { color: var(--risk) !important; }
+.scard-val.bg, .scard-val.by, .scard-val.bb { background: none; }
+.pos { color: var(--up) !important; }
+.neg { color: var(--down) !important; }
 
 /* ── Chips ── */
 .chip {
@@ -178,7 +188,7 @@ hr.section-rule {
     font-size: 0.75rem; font-weight: 600; margin: 0.1rem;
 }
 .chip-bench {
-    background: var(--pink-dim); border-color: var(--pink); color: var(--pink);
+    background: var(--accent-dim); border-color: var(--accent); color: var(--accent);
 }
 
 /* ── Metric cards ── */
@@ -200,7 +210,7 @@ hr.section-rule {
 .by { background: var(--warn-dim);    color: var(--warn);    }
 .br { background: var(--risk-dim);    color: var(--risk);    }
 .bb { background: var(--neutral-dim); color: var(--neutral); }
-.bp { background: var(--pink-dim);    color: var(--pink);    }
+.bp { background: var(--accent-dim);    color: var(--accent);    }
 
 .mcard-rule { border: none; border-top: 1px solid var(--line); margin: 0.5rem 0; }
 .mcard-desc { font-size: 0.79rem; color: var(--muted); line-height: 1.45; }
@@ -217,7 +227,7 @@ hr.section-rule {
 .rtag-by { background: var(--warn-dim);    color: var(--warn);    }
 .rtag-br { background: var(--risk-dim);    color: var(--risk);    }
 .rtag-bb { background: var(--neutral-dim); color: var(--neutral); }
-.rtag-bp { background: var(--pink-dim);    color: var(--pink);    }
+.rtag-bp { background: var(--accent-dim);    color: var(--accent);    }
 
 /* ── Onboarding steps ── */
 .step-card {
@@ -231,13 +241,13 @@ hr.section-rule {
 .step-card:hover {
     transform: translateY(-2px);
     box-shadow: 0 6px 18px var(--shadow);
-    border-color: var(--pink);
+    border-color: var(--accent);
 }
 .step-num {
     display: inline-block; width: 1.7rem; height: 1.7rem;
     border-radius: var(--radius);
-    background: linear-gradient(135deg, var(--pink-dim), var(--neutral-dim));
-    color: var(--pink);
+    background: var(--accent-dim);
+    color: var(--accent);
     font-weight: 700; font-size: 0.8rem; text-align: center; line-height: 1.7rem;
     margin-bottom: 0.55rem;
 }
@@ -255,7 +265,7 @@ hr.section-rule {
     display: inline-block; font-size: 0.65rem; font-weight: 700;
     text-transform: uppercase; letter-spacing: 0.08em;
     padding: 0.1rem 0.45rem; border-radius: var(--radius); margin-bottom: 0.6rem;
-    background: var(--pink-dim); color: var(--pink);
+    background: var(--accent-dim); color: var(--accent);
 }
 .gcard-def { font-size: 0.9rem; color: var(--muted); line-height: 1.65; }
 .gcard-ex {
@@ -269,7 +279,7 @@ hr.section-rule {
 .sb-label {
     font-size: 0.7rem; font-weight: 700;
     text-transform: uppercase; letter-spacing: 0.09em;
-    color: var(--pink); margin-bottom: 0.25rem; display: block;
+    color: var(--accent); margin-bottom: 0.25rem; display: block;
 }
 .sb-gap {
     border-top: 1px solid var(--line);

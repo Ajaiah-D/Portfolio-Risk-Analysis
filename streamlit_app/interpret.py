@@ -196,7 +196,7 @@ def corr_cell_css(v):
     if v >= 0.4:  return "background: rgba(245,158,11,0.10)"
     if v >= 0.2:  return "background: rgba(16,185,129,0.10)"
     if v >= 0:    return "background: rgba(16,185,129,0.18); color: #10b981"
-    return "background: rgba(252,136,229,0.15); color: #fc88e5"
+    return "background: rgba(99,102,241,0.15); color: #6366f1"   # inverse: indigo
 
 COL_FNS = {
     "Sharpe":      lambda v: _c(v, 1.0, 0.5),
