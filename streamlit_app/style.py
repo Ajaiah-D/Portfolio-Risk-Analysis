@@ -45,6 +45,10 @@ _CSS = """
        red than the status colours, so the text keeps its contrast. */
     --up:         #16a34a;
     --down:       #dc2626;
+    /* Civic layout: a dark masthead ribbon and a strong rule for tiles. */
+    --ribbon:      #2b1820;
+    --rule-strong: color-mix(in srgb, currentColor 75%, transparent);
+    --ink2:        color-mix(in srgb, currentColor 78%, transparent);
 }
 @supports (color: light-dark(#000, #fff)) {
     :root {
@@ -62,14 +66,9 @@ _CSS = """
 .block-container {
     padding: 2rem 2.5rem 3rem 2.5rem;
     max-width: 1800px;
-    animation: pageFade 0.35s ease-out;
 }
 @media (max-width: 640px) {
     .block-container { padding-left: 1rem; padding-right: 1rem; }
-}
-@keyframes pageFade {
-    from { opacity: 0; transform: translateY(4px); }
-    to   { opacity: 1; transform: none; }
 }
 
 /* Streamlit's default drag-resized sidebar width is narrower than the
@@ -81,27 +80,44 @@ _CSS = """
     [data-testid="stSidebar"] { min-width: 380px !important; }
 }
 
+/* ── Masthead ribbon ──
+   A dark band with a wine rule, in the style of an official statistics
+   service. The ribbon is the same dark plum in both modes (a near-black
+   ribbon vanished on the dark page), so its text is always white. */
+.masthead {
+    display: flex; flex-wrap: wrap; justify-content: space-between;
+    align-items: baseline; gap: 0.3rem 1rem;
+    background: var(--ribbon); color: #ffffff;
+    border-bottom: 4px solid var(--accent);
+    padding: 0.7rem 1rem; margin: 0 0 1.5rem 0;
+}
+.masthead-name { font-size: 1rem; font-weight: 700; letter-spacing: 0.01em; }
+.masthead-meta { font-size: 0.82rem; color: rgba(255,255,255,0.78); }
+
 /* ── Typography ── */
 .hero-title {
-    font-size: 2.3rem; font-weight: 700;
-    letter-spacing: -0.8px; margin: 0 0 0.35rem 0; padding: 0;
+    font-size: 2.25rem; font-weight: 700; line-height: 1.15;
+    letter-spacing: -0.4px; margin: 0 0 0.5rem 0; padding: 0;
 }
-.hero-title span { color: var(--accent); }
 .hero-sub {
-    font-size: 0.95rem; color: var(--muted);
-    margin: 0 0 1.6rem 0; line-height: 1.65; max-width: 52rem;
+    font-size: 1.02rem; color: var(--ink2);
+    margin: 0 0 1.6rem 0; line-height: 1.6; max-width: 48rem;
 }
 
 /* ── Section headers ── */
+/* A thin rule opens each section; the kicker is quiet, the heading carries
+   the weight. */
 .section-title {
-    font-size: 0.72rem; font-weight: 700;
-    text-transform: uppercase; letter-spacing: 0.1em;
-    color: var(--accent);
-    margin: 2.4rem 0 0.25rem 0;
+    font-size: 0.75rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--muted);
+    border-top: 1px solid var(--line);
+    padding-top: 1.1rem;
+    margin: 2.2rem 0 0.3rem 0;
 }
 .section-heading {
-    font-size: 1.05rem; font-weight: 600;
-    margin: 0 0 0.3rem 0;
+    font-size: 1.25rem; font-weight: 700;
+    margin: 0 0 0.35rem 0;
 }
 .section-desc {
     font-size: 0.82rem; color: var(--muted);
@@ -114,8 +130,7 @@ hr.section-rule {
 /* ── Info bar ── */
 .info-bar {
     background: var(--tint);
-    border: 1px solid var(--line);
-    border-left: 3px solid var(--accent);
+    border-left: 4px solid var(--accent);
     border-radius: var(--radius);
     padding: 1rem 1.25rem;
     margin-bottom: 1.6rem;
@@ -126,19 +141,16 @@ hr.section-rule {
 /* ── Insight cards ── */
 .insight {
     background: var(--tint);
-    border: 1px solid var(--line);
     border-radius: var(--radius);
     padding: 0.9rem 1.15rem;
     margin-bottom: 0.5rem;
-    font-size: 0.84rem; line-height: 1.6;
-    transition: border-color 0.15s ease, transform 0.15s ease;
+    font-size: 0.86rem; line-height: 1.6;
 }
-.insight:hover { transform: translateX(2px); }
 .insight b { font-weight: 600; }
-.insight-good { border-left: 3px solid var(--good); }
-.insight-warn { border-left: 3px solid var(--warn); }
-.insight-risk { border-left: 3px solid var(--risk); }
-.insight-info { border-left: 3px solid var(--neutral); }
+.insight-good { border-left: 4px solid var(--good); }
+.insight-warn { border-left: 4px solid var(--warn); }
+.insight-risk { border-left: 4px solid var(--risk); }
+.insight-info { border-left: 4px solid var(--neutral); }
 .insight-tag {
     display: inline-block; padding: 0.1rem 0.5rem; margin-right: 0.5rem;
     border-radius: var(--radius); font-size: 0.63rem; font-weight: 700;
@@ -146,29 +158,23 @@ hr.section-rule {
 }
 
 /* ── Scorecard row ── */
+/* KPI tiles: a flat surface with a rule along the top instead of a boxed,
+   shadowed card. The headline row gets the wine rule, metric cards a
+   neutral one. */
 .scard, .mcard {
     background: var(--tint);
-    border: 1px solid var(--line);
-    border-radius: var(--radius);
-    box-shadow: 0 1px 4px var(--shadow);
-    margin-bottom: 0.55rem;
-    transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+    border-radius: 0;
+    margin-bottom: 0.75rem;
 }
-.scard { padding: 1rem 1.15rem; }
-.mcard { padding: 1.25rem 1.35rem; }
-.scard:hover, .mcard:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 18px var(--shadow);
-    border-color: var(--accent);
-}
+.scard { padding: 0.9rem 1.1rem 1rem 1.1rem; border-top: 3px solid var(--accent); }
+.mcard { padding: 1.1rem 1.25rem 1.2rem 1.25rem; border-top: 3px solid var(--rule-strong); }
 .scard-label {
-    font-size: 0.63rem; font-weight: 700;
-    text-transform: uppercase; letter-spacing: 0.1em;
-    color: var(--muted); margin-bottom: 0.25rem;
+    font-size: 0.85rem; font-weight: 700;
+    color: var(--ink2); margin-bottom: 0.2rem;
 }
 .scard-val {
-    font-size: 1.35rem; font-weight: 700;
-    line-height: 1.15;
+    font-size: 1.85rem; font-weight: 700;
+    line-height: 1.2;
 }
 .scard-sub {
     font-size: 0.74rem; color: var(--muted); margin-top: 0.2rem;
@@ -193,9 +199,8 @@ hr.section-rule {
 
 /* ── Metric cards ── */
 .mcard-label {
-    font-size: 0.67rem; font-weight: 700;
-    text-transform: uppercase; letter-spacing: 0.1em;
-    color: var(--muted); margin-bottom: 0.3rem;
+    font-size: 0.85rem; font-weight: 700;
+    color: var(--ink2); margin-bottom: 0.3rem;
 }
 .mcard-val {
     font-size: 1.75rem; font-weight: 700;
@@ -232,16 +237,9 @@ hr.section-rule {
 /* ── Onboarding steps ── */
 .step-card {
     background: var(--tint);
-    border: 1px solid var(--line);
-    border-radius: var(--radius);
-    padding: 1.3rem 1.4rem;
+    border-top: 3px solid var(--accent);
+    padding: 1.2rem 1.35rem;
     min-height: 7.5rem;
-    transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
-}
-.step-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 18px var(--shadow);
-    border-color: var(--accent);
 }
 .step-num {
     display: inline-block; width: 1.7rem; height: 1.7rem;
@@ -292,3 +290,10 @@ hr.section-rule {
 
 def inject_css():
     st.markdown(_CSS, unsafe_allow_html=True)
+
+
+def masthead(name, meta=""):
+    """One line of HTML for the dark masthead ribbon at the top of a page."""
+    meta_html = f'<span class="masthead-meta">{meta}</span>' if meta else ""
+    return (f'<header class="masthead"><span class="masthead-name">{name}</span>'
+            f'{meta_html}</header>')

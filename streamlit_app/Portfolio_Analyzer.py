@@ -93,10 +93,11 @@ def load_universe():
     etfs = pd.DataFrame(etf_rows)
 
     sectors = sorted(const["GICS Sector"].unique().tolist())
-    return const, etfs, sectors
+    data_through = max(last_dates.values()) if last_dates else ""
+    return const, etfs, sectors, data_through
 
 
-const_df, etfs_df, all_sectors = load_universe()
+const_df, etfs_df, all_sectors, data_through = load_universe()
 
 EQUAL_MODE = "Equal weight"
 CUSTOM_MODE = "Custom amounts ($)"
@@ -353,7 +354,14 @@ start_date = end_date - datetime.timedelta(days=_days[time_horizon] + _buffer[ti
 
 # ── Header ────────────────────────────────────────────────────────────────────
 st.markdown(
-    '<h1 class="hero-title">Portfolio <span>Risk</span> Analysis</h1>',
+    style.masthead(
+        "Portfolio Risk Analysis",
+        f"{len(const_df)} S&amp;P 500 stocks and {len(etfs_df)} ETFs · prices through {data_through}",
+    ),
+    unsafe_allow_html=True,
+)
+st.markdown(
+    '<div class="hero-title" role="heading" aria-level="1">Portfolio Analyzer</div>',
     unsafe_allow_html=True,
 )
 st.markdown(
