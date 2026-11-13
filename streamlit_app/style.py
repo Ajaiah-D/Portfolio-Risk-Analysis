@@ -186,6 +186,35 @@ hr.section-rule {
 .pos { color: var(--up) !important; }
 .neg { color: var(--down) !important; }
 
+/* ── In-brief strip ──
+   A short written summary at the top of the Overview, like a statistics
+   bulletin. Each line has a square marker: green/red for a gain or loss,
+   the status colours for better/worse than SPY, grey for context. */
+.brief {
+    background: var(--tint);
+    border-left: 4px solid var(--accent);
+    padding: 1rem 1.25rem 0.85rem 1.25rem;
+    margin: 0.3rem 0 0.4rem 0;
+}
+.brief-head {
+    display: flex; flex-wrap: wrap; align-items: baseline;
+    gap: 0.6rem; margin: 0 0 0.45rem 0;
+}
+.brief-title { font-size: 1.05rem; font-weight: 700; }
+.brief-vs { font-size: 0.85rem; color: var(--muted); }
+.brief-item {
+    display: flex; align-items: flex-start; gap: 0.6rem;
+    font-size: 0.95rem; line-height: 1.55; margin: 0.35rem 0;
+}
+.brief-item strong { font-weight: 700; }
+.brief-dot { flex: none; width: 10px; height: 10px; margin-top: 0.45rem; }
+.brief-dot-up      { background: var(--up); }
+.brief-dot-down    { background: var(--down); }
+.brief-dot-good    { background: var(--good); }
+.brief-dot-bad     { background: var(--risk); }
+.brief-dot-warn    { background: var(--warn); }
+.brief-dot-neutral { background: var(--muted); }
+
 /* ── Chips ── */
 .chip {
     display: inline-block;
@@ -290,6 +319,19 @@ hr.section-rule {
 
 def inject_css():
     st.markdown(_CSS, unsafe_allow_html=True)
+
+
+def brief_html(title, meta, items):
+    """One line of HTML for the in-brief strip. items are (html, tone) pairs;
+    the html is trusted markup built by the app from its own numbers."""
+    rows = "".join(
+        f'<div class="brief-item" role="listitem"><span class="brief-dot brief-dot-{tone}" '
+        f'aria-hidden="true"></span><span>{text}</span></div>'
+        for text, tone in items
+    )
+    return (f'<section class="brief" aria-label="{title}"><div class="brief-head">'
+            f'<span class="brief-title">{title}</span><span class="brief-vs">{meta}</span></div>'
+            f'<div role="list">{rows}</div></section>')
 
 
 def masthead(name, meta=""):

@@ -560,6 +560,40 @@ tab_overview, tab_perf, tab_risk, tab_div, tab_whatif, tab_plan = st.tabs(
 
 # ═══ OVERVIEW ═════════════════════════════════════════════════════════════════
 with tab_overview:
+    # ── In brief: the headline numbers written out as sentences ──
+    _gap = (_port_total - _spy_total) * 100
+    _brief = [
+        (f"{'▲' if _port_total >= 0 else '▼'} Returned <strong>{_port_total*100:+.1f}%</strong>, "
+         f"<strong>{abs(_gap):.1f} points {'ahead of' if _gap >= 0 else 'behind'}</strong> "
+         f"SPY ({_spy_total*100:+.1f}%).",
+         "up" if _port_total >= 0 else "down"),
+        (f"Swings were <strong>{'smaller' if _port_vol <= _spy_vol else 'larger'}</strong> than the "
+         f"market's: {_port_vol*100:.1f}% a year against {_spy_vol*100:.1f}% for SPY.",
+         "good" if _port_vol <= _spy_vol else "bad"),
+    ]
+    if not pd.isna(_max_dd):
+        # &#36; is "$": a bare "$...$" pair would be read as LaTeX by st.markdown
+        _dd_dollars = (f", or &#36;{abs(_max_dd) * portfolio_value:,.0f} on &#36;{portfolio_value:,.0f}"
+                       if portfolio_value else "")
+        _brief.append((f"Worst fall from a peak: <strong>{_max_dd*100:.1f}%</strong>{_dd_dollars}.",
+                       "neutral"))
+    _watch = [i["tag"].lower() for i in insight_items if i["level"] in ("warn", "risk")]
+    if _watch:
+        _n = len(_watch)
+        _brief.append((f"<strong>{_n} {'thing' if _n == 1 else 'things'} to watch</strong> in the "
+                       f"insights below: {', '.join(_watch)}.", "warn"))
+    else:
+        _brief.append(("No warnings in the insights below.", "good"))
+    st.markdown(
+        style.brief_html(
+            "In brief",
+            f"{_HORIZON_DISPLAY[time_horizon]} to {end_date} · compared with SPY · "
+            "written automatically from your selection",
+            _brief,
+        ),
+        unsafe_allow_html=True,
+    )
+
     _section("At a Glance", "Portfolio vs. Market",
              "How your portfolio performed against simply holding SPY over the same period.")
 
