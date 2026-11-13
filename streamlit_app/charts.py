@@ -12,7 +12,13 @@ import plotly.graph_objects as go
 _CLEAR    = "rgba(0,0,0,0)"
 _MID_GRAY = "#9a9a9a"               # SPY / reference labels: visible on white and black
 _REF_LINE = "rgba(128,128,128,0.6)"
-_HOLDING  = "#94a3b8"               # frontier holdings: neutral so the pink star stands out
+_HOLDING  = "#94a3b8"               # frontier holdings: neutral so the portfolio star stands out
+# "Your Portfolio" everywhere (line, frontier star, Monte Carlo target). Calm
+# indigo, distinct from the green/red used for gains and losses; the wine
+# accent is kept for the app's chrome and never used for data.
+PORTFOLIO = "#4f46e5"
+# Frontier cloud: one hue, light to dark blue as Sharpe rises.
+_SHARPE_SCALE = [[0.0, "#dbeafe"], [0.5, "#60a5fa"], [1.0, "#1e40af"]]
 
 
 def _plotly_layout(height=380, ylabel="", xlabel=""):
@@ -29,18 +35,17 @@ def _plotly_layout(height=380, ylabel="", xlabel=""):
     )
 
 
+# Series colours in a fixed order, checked for colour-blind separation between
+# neighbours in both modes. No red, green or wine: those mean loss, gain and
+# the app accent.
 _LINE_COLORS = [
-    "#fc88e5", "#10b981", "#f59e0b", "#8b8cf8", "#f43f5e",
-    "#06b6d4", "#a78bfa", "#fb923c", "#34d399", "#60a5fa",
+    PORTFOLIO, "#d97706", "#0891b2", "#a855f7", "#0d9488", "#a16207", "#0284c7",
 ]
 
-# Holdings on the cumulative chart skip pink, which marks "Your Portfolio".
-_HOLDING_LINE_COLORS = [c for c in _LINE_COLORS if c != "#fc88e5"]
+# Holdings on the cumulative chart skip indigo, which marks "Your Portfolio".
+_HOLDING_LINE_COLORS = [c for c in _LINE_COLORS if c != PORTFOLIO]
 
-_SECTOR_COLORS = [
-    "#fc88e5", "#10b981", "#f59e0b", "#8b8cf8", "#f43f5e",
-    "#06b6d4", "#a78bfa", "#fb923c", "#34d399", "#60a5fa", "#e879f9",
-]
+_SECTOR_COLORS = _LINE_COLORS + ["#94a3b8", "#78716c", "#b45309", "#1e40af"]
 
 
 def build_cumulative_chart(price_df, weights_map):
@@ -75,7 +80,7 @@ def build_cumulative_chart(price_df, weights_map):
     fig.add_trace(go.Scatter(
         x=cumport.index, y=(cumport * 100).round(2),
         name="Your Portfolio",
-        line=dict(color="#fc88e5", width=3.2),
+        line=dict(color=PORTFOLIO, width=3.2),
         hovertemplate="<b>Portfolio</b>: %{y:.1f}%<extra></extra>",
     ))
 
@@ -122,7 +127,7 @@ def build_frontier_chart(price_df, weights_map, rfr=0.05, n=2500,
     fig.add_trace(go.Scatter(
         x=p_vols, y=p_rets, mode="markers",
         marker=dict(
-            color=p_sharpes, colorscale="RdPu",
+            color=p_sharpes, colorscale=_SHARPE_SCALE,
             size=3, opacity=0.45,
             colorbar=dict(title=dict(text="Sharpe", side="right"),
                           thickness=12, len=0.55),
@@ -155,7 +160,7 @@ def build_frontier_chart(price_df, weights_map, rfr=0.05, n=2500,
 
     if opt_points:
         symbols = {"Max Sharpe": ("#10b981", "star-triangle-up"),
-                   "Min Volatility": ("#8b8cf8", "star-square")}
+                   "Min Volatility": ("#d97706", "star-square")}
         for label, (v, rt) in opt_points.items():
             color, sym = symbols.get(label, ("#f59e0b", "circle"))
             fig.add_trace(go.Scatter(
@@ -170,10 +175,10 @@ def build_frontier_chart(price_df, weights_map, rfr=0.05, n=2500,
 
     fig.add_trace(go.Scatter(
         x=[y_vol], y=[y_ret], mode="markers+text",
-        marker=dict(color="#fc88e5", size=20, symbol="star",
-                    line=dict(color=_REF_LINE, width=1.5)),
+        marker=dict(color=PORTFOLIO, size=20, symbol="star",
+                    line=dict(color="#ffffff", width=1.5)),  # ring lifts it off the cloud
         text=["Your Portfolio"], textposition="top center",
-        textfont=dict(size=11, color="#fc88e5", family="Inter"),
+        textfont=dict(size=11, color=PORTFOLIO, family="Inter"),
         name="Your Portfolio",
         hovertemplate="<b>Your Portfolio</b><br>Vol: %{x:.1f}%  Return: %{y:.1f}%<extra></extra>",
     ))
@@ -270,7 +275,7 @@ def build_rolling_vol_chart(port_r, bench_r):
     fig = go.Figure()
     fig.add_trace(go.Scatter(
         x=pv.index, y=pv.round(2), name="Portfolio",
-        line=dict(color="#fc88e5", width=2),
+        line=dict(color=PORTFOLIO, width=2),
         hovertemplate="Portfolio: %{y:.1f}%<extra></extra>",
     ))
     fig.add_trace(go.Scatter(
@@ -354,9 +359,9 @@ def build_monte_carlo(port_r_series, portfolio_value, target_value, years,
     ))
     fig.add_hline(
         y=target_value,
-        line=dict(color="#fc88e5", width=1.5, dash="dot"),
+        line=dict(color=PORTFOLIO, width=1.5, dash="dot"),
         annotation_text=f"  Target ${target_value:,.0f}",
-        annotation_font=dict(color="#fc88e5", size=11),
+        annotation_font=dict(color=PORTFOLIO, size=11),
         annotation_position="right",
     )
     fig.add_hline(
