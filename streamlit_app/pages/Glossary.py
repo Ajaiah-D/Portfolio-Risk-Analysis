@@ -17,9 +17,7 @@ style.inject_css()
 st.markdown("<style>.block-container { max-width: 1100px; }</style>", unsafe_allow_html=True)
 
 # ── Header ──
-st.markdown(style.masthead("Portfolio Risk Analysis"), unsafe_allow_html=True)
-st.markdown('<div class="hero-title" role="heading" aria-level="1">Glossary</div>',
-            unsafe_allow_html=True)
+st.markdown('<h1 class="hero-title">Financial <span>Glossary</span></h1>', unsafe_allow_html=True)
 st.markdown(
     '<p class="hero-sub">Plain-English definitions for every term used in this tool. '
     'No finance background required.</p>',

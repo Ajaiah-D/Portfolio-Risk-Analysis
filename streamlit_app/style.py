@@ -45,8 +45,7 @@ _CSS = """
        red than the status colours, so the text keeps its contrast. */
     --up:         #16a34a;
     --down:       #dc2626;
-    /* Civic layout: a dark masthead ribbon and a strong rule for tiles. */
-    --ribbon:      #2b1820;
+    /* Civic layout: a strong rule for tiles and a softer ink for labels. */
     --rule-strong: color-mix(in srgb, currentColor 75%, transparent);
     --ink2:        color-mix(in srgb, currentColor 78%, transparent);
 }
@@ -80,28 +79,15 @@ _CSS = """
     [data-testid="stSidebar"] { min-width: 380px !important; }
 }
 
-/* ── Masthead ribbon ──
-   A dark band with a wine rule, in the style of an official statistics
-   service. The ribbon is the same dark plum in both modes (a near-black
-   ribbon vanished on the dark page), so its text is always white. */
-.masthead {
-    display: flex; flex-wrap: wrap; justify-content: space-between;
-    align-items: baseline; gap: 0.3rem 1rem;
-    background: var(--ribbon); color: #ffffff;
-    border-bottom: 4px solid var(--accent);
-    padding: 0.7rem 1rem; margin: 0 0 1.5rem 0;
-}
-.masthead-name { font-size: 1rem; font-weight: 700; letter-spacing: 0.01em; }
-.masthead-meta { font-size: 0.82rem; color: rgba(255,255,255,0.78); }
-
 /* ── Typography ── */
 .hero-title {
-    font-size: 2.25rem; font-weight: 700; line-height: 1.15;
-    letter-spacing: -0.4px; margin: 0 0 0.5rem 0; padding: 0;
+    font-size: 2.3rem; font-weight: 700;
+    letter-spacing: -0.8px; margin: 0 0 0.35rem 0; padding: 0;
 }
+.hero-title span { color: var(--accent); }
 .hero-sub {
-    font-size: 1.02rem; color: var(--ink2);
-    margin: 0 0 1.6rem 0; line-height: 1.6; max-width: 48rem;
+    font-size: 0.95rem; color: var(--muted);
+    margin: 0 0 1.6rem 0; line-height: 1.65; max-width: 52rem;
 }
 
 /* ── Section headers ── */
@@ -333,9 +319,3 @@ def brief_html(title, meta, items):
             f'<span class="brief-title">{title}</span><span class="brief-vs">{meta}</span></div>'
             f'<div role="list">{rows}</div></section>')
 
-
-def masthead(name, meta=""):
-    """One line of HTML for the dark masthead ribbon at the top of a page."""
-    meta_html = f'<span class="masthead-meta">{meta}</span>' if meta else ""
-    return (f'<header class="masthead"><span class="masthead-name">{name}</span>'
-            f'{meta_html}</header>')
