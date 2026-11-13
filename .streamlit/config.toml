@@ -5,20 +5,20 @@
 # streamlit_app/style.py only styles the app's own HTML cards, never
 # Streamlit's widgets.
 [theme]
-primaryColor = "#9d174d"
+primaryColor = "#1a4480"
 font = "Inter:https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap, sans-serif"
 baseRadius = "2px"   # near-square corners; keep in sync with --radius in style.py
 
 [theme.light]
-primaryColor = "#9d174d"              # wine; keep in sync with --accent in style.py
+primaryColor = "#1a4480"              # navy; keep in sync with --accent in style.py
 backgroundColor = "#ffffff"
-secondaryBackgroundColor = "#faf5f7"
-textColor = "#1f1418"
-borderColor = "#e9dde2"
+secondaryBackgroundColor = "#f5f6f8"
+textColor = "#15181d"
+borderColor = "#e2e5e9"
 
 [theme.dark]
-primaryColor = "#e0789f"              # light wine; keep in sync with --accent in style.py
-backgroundColor = "#120c0f"
-secondaryBackgroundColor = "#1e161a"
-textColor = "#f0e8eb"
-borderColor = "#33272d"
+primaryColor = "#8ab4f8"              # light navy; keep in sync with --accent in style.py
+backgroundColor = "#111316"              # neutral charcoal; navy is only an accent
+secondaryBackgroundColor = "#1b1e23"
+textColor = "#e7e9ec"
+borderColor = "#2d3138"

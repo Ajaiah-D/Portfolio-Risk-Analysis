@@ -26,13 +26,13 @@ _CSS = """
     /* Near-square corners everywhere; matches baseRadius in config.toml. */
     --radius: 2px;
 
-    /* Wine accent for the app's own chrome (labels, borders, chips, badges).
+    /* Navy accent for the app's own chrome (labels, borders, chips, badges).
        It is never a data colour: charts use indigo (see charts.py). Per-mode
        values match primaryColor in .streamlit/config.toml; light-dark()
        resolves against the color-scheme Streamlit sets for the active theme,
        and browsers without it keep the plain values set here. */
-    --accent:     #db2777;
-    --accent-dim: rgba(219,39,119,0.12);
+    --accent:     #1a4480;
+    --accent-dim: rgba(26,68,128,0.12);
     --good:       #10b981;
     --good-dim:   rgba(16,185,129,0.14);
     --warn:       #f59e0b;
@@ -51,8 +51,8 @@ _CSS = """
 }
 @supports (color: light-dark(#000, #fff)) {
     :root {
-        --accent:     light-dark(#9d174d, #e0789f);
-        --accent-dim: light-dark(rgba(157,23,77,0.10), rgba(224,120,159,0.16));
+        --accent:     light-dark(#1a4480, #8ab4f8);
+        --accent-dim: light-dark(rgba(26,68,128,0.10), rgba(138,180,248,0.16));
         --up:         light-dark(#15803d, #22c55e);
         --down:       light-dark(#b91c1c, #f87171);
     }
@@ -145,7 +145,7 @@ hr.section-rule {
 
 /* ── Scorecard row ── */
 /* KPI tiles: a flat surface with a rule along the top instead of a boxed,
-   shadowed card. The headline row gets the wine rule, metric cards a
+   shadowed card. The headline row gets the navy rule, metric cards a
    neutral one. */
 .scard, .mcard {
     background: var(--tint);

@@ -14,7 +14,7 @@ _MID_GRAY = "#9a9a9a"               # SPY / reference labels: visible on white a
 _REF_LINE = "rgba(128,128,128,0.6)"
 _HOLDING  = "#94a3b8"               # frontier holdings: neutral so the portfolio star stands out
 # "Your Portfolio" everywhere (line, frontier star, Monte Carlo target). Calm
-# indigo, distinct from the green/red used for gains and losses; the wine
+# indigo, distinct from the green/red used for gains and losses; the navy
 # accent is kept for the app's chrome and never used for data.
 PORTFOLIO = "#4f46e5"
 # Frontier cloud: one hue, light to dark blue as Sharpe rises.
@@ -36,7 +36,7 @@ def _plotly_layout(height=380, ylabel="", xlabel=""):
 
 
 # Series colours in a fixed order, checked for colour-blind separation between
-# neighbours in both modes. No red, green or wine: those mean loss, gain and
+# neighbours in both modes. No red, green or navy: those mean loss, gain and
 # the app accent.
 _LINE_COLORS = [
     PORTFOLIO, "#d97706", "#0891b2", "#a855f7", "#0d9488", "#a16207", "#0284c7",
