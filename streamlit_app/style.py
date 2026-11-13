@@ -105,6 +105,23 @@ _CSS = """
     font-size: 1.25rem; font-weight: 700;
     margin: 0 0 0.35rem 0;
 }
+/* The main tabs (Overview, Performance, ...) are the page's navigation, so
+   their labels match the section headings (1.25rem, bold) instead of
+   Streamlit's small default. Scoped to the tabs' own key and the standard
+   role="tab" attribute, not Streamlit's private test ids. */
+.st-key-main_tabs [role="tablist"] {
+    gap: 2rem;
+    border-bottom: 2px solid var(--line);
+}
+.st-key-main_tabs [role="tab"] {
+    padding: 0.4rem 0 0.7rem 0;
+}
+.st-key-main_tabs [role="tab"] p {
+    font-size: 1.25rem; font-weight: 700;
+}
+.st-key-main_tabs [role="tab"][aria-selected="true"] p {
+    color: var(--accent);
+}
 .section-desc {
     font-size: 0.82rem; color: var(--muted);
     margin: 0 0 1.1rem 0; line-height: 1.55;

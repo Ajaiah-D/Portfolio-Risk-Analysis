@@ -547,7 +547,8 @@ def _section(title, heading, desc):
 
 # ── Tabs ──────────────────────────────────────────────────────────────────────
 tab_overview, tab_perf, tab_risk, tab_div, tab_whatif, tab_plan = st.tabs(
-    ["Overview", "Performance", "Risk", "Diversification", "What-If & Optimize", "Planning"]
+    ["Overview", "Performance", "Risk", "Diversification", "What-If & Optimize", "Planning"],
+    key="main_tabs",  # style.py sizes these up via .st-key-main_tabs
 )
 
 # ═══ OVERVIEW ═════════════════════════════════════════════════════════════════
