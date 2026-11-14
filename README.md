@@ -1,6 +1,6 @@
 # Portfolio Risk Analysis
 
-**[Live demo →](https://ajaiah-d-portfolio-risk--streamlit-appportfolio-analyzer-ij9gqb.streamlit.app/)**
+**[Live demo →](https://portfolio-risk-insights.streamlit.app/)**
 
 An interactive portfolio risk dashboard built with Streamlit, deployed on Streamlit Community Cloud, backed by a SQLite database of historical price data sourced from Massive.com (formerly Polygon.io) and yfinance. Built for two audiences at once: people who want to understand what their portfolio actually does, and people learning what these metrics mean in the first place. Every number comes with a plain-English interpretation and a full glossary.
 
