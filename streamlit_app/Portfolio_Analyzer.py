@@ -580,7 +580,9 @@ with tab_overview:
     st.markdown(
         style.brief_html(
             "In brief",
-            f"{_HORIZON_DISPLAY[time_horizon]} · prices through {df['date'].max().date()} · "
+            # Show the real date range: history starts in January 2020, so a 10-year
+            # horizon currently covers less than 10 years and should say so.
+            f"{_HORIZON_DISPLAY[time_horizon]} · prices {df['date'].min().date()} to {df['date'].max().date()} · "
             "compared with SPY · written automatically from your selection",
             _brief,
         ),
