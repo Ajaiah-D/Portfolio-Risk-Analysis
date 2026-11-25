@@ -5,7 +5,7 @@ pandas>=2.2
 numpy>=1.26
 
 # Data ingestion scripts
-yfinance>=0.2.40
+yfinance>=1.2,<2
 requests>=2.31
 python-dotenv>=1.0
 

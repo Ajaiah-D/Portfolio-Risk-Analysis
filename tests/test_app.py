@@ -151,3 +151,47 @@ def test_delisted_holding_blocks_analysis_with_explanation():
     # the picker labels it too, so the user is warned before running
     labels = at.multiselect(key="holdings_sel").options
     assert any(o.startswith("WBA") and "delisted" in o for o in labels)
+
+
+def _db_has(ticker):
+    import sqlite3
+    if not os.path.exists(DB):
+        return False
+    conn = sqlite3.connect(DB)
+    try:
+        return conn.execute(
+            "SELECT 1 FROM daily_prices WHERE ticker = ? LIMIT 1", (ticker,)).fetchone() is not None
+    finally:
+        conn.close()
+
+
+needs_funds = pytest.mark.skipif(
+    not _db_has("FXAIX"),
+    reason="price database has no mutual funds yet (the refresh backfills them)",
+)
+
+
+@needs_funds
+def test_mutual_funds_are_searchable_and_labelled():
+    at = make_app().run()
+    assert not at.exception
+    opts = at.multiselect(key="holdings_sel").options
+    fxaix = [o for o in opts if o.startswith("FXAIX")]
+    assert fxaix == ["FXAIX  —  Fidelity 500 Index Fund  (mutual fund)"]
+    # ETFs keep their plain label
+    assert any(o.startswith("SPY") and "mutual fund" not in o for o in opts)
+    caption = " ".join(str(c.value) for c in at.caption)
+    assert "mutual funds" in caption
+
+
+@needs_funds
+def test_portfolio_with_a_mutual_fund_analyses_without_errors():
+    at = make_app()
+    at.query_params["t"] = "FXAIX,VBTLX,AAPL"
+    at.query_params["h"] = "5"
+    at.run()
+    assert not at.exception
+    assert len(at.error) == 0
+    assert len(at.tabs) == 6
+    all_md = " ".join(str(m.value) for m in at.markdown)
+    assert "Sharpe" in all_md

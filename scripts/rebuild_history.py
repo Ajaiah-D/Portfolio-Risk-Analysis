@@ -48,8 +48,11 @@ def run(tickers=None, today=None):
         log.info(f"Skipping delisted tickers: {skipped}")
 
     summary = {"restated": [], "refused": {}}
+    # Adjustment-check warnings are logged (and annotated in Actions) as they
+    # are found; they never stop a rebuild.
+    checked = {"adjustment_issues": []}
     for i, ticker in enumerate(targets, 1):
-        ok, message = refresh_prices.restate_ticker(ticker, fetch_end, yesterday)
+        ok, message = refresh_prices.restate_ticker(ticker, fetch_end, yesterday, checked)
         if ok:
             summary["restated"].append(ticker)
             log.info(f"[{i}/{len(targets)}] {ticker}: {message}")
@@ -59,7 +62,8 @@ def run(tickers=None, today=None):
         time.sleep(refresh_prices.SLEEP)
 
     log.info(f"Rebuild done. Restated {len(summary['restated'])}, "
-             f"refused {len(summary['refused'])}: {summary['refused'] or 'none'}")
+             f"refused {len(summary['refused'])}: {summary['refused'] or 'none'}. "
+             f"Adjustment warnings: {len(checked['adjustment_issues'])}")
     return summary
 
 

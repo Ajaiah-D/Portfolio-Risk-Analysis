@@ -7,7 +7,13 @@ Two kinds of finding:
 - ERRORS break an assumption the app relies on (grain, non-null prices,
   ISO dates, every ticker having metadata). Exit code 1.
 - WARNINGS need a human to look: one-day moves large enough to be an
-  unadjusted stock split. Exit code 0 unless --strict is passed.
+  unadjusted stock split, and twin funds (funds tracking the same index)
+  whose daily returns disagree. Exit code 0 unless --strict is passed.
+
+The twin-fund check lists divergences from the last --twin-days days
+(default 30; 0 lists the whole history) and counts older ones, which are
+known history explained in the README. The groups and tolerances live in
+scripts/checks.py.
 
 A ticker that has stopped updating is an ERROR unless it is listed in
 tickers/delisted.csv: either its symbol needs fixing or someone needs to
@@ -29,10 +35,15 @@ import sqlite3
 import sys
 from datetime import date, timedelta
 
+import pandas as pd
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+from scripts.checks import TWIN_GROUPS, annotate_warning, twin_flags
 from scripts.symbols import load_delisted
 
 DB_PATH = "data/portfolio_data.db"
+# Twin-fund divergences newer than this are listed; older ones are counted.
+TWIN_DAYS = 30
 
 # A one-day close-to-close move at least this large is treated as suspect.
 # Real moves this size exist (energy names fell ~50% on 2020-03-09), so this
@@ -108,6 +119,51 @@ def find_stale_tickers(conn, stale_days=STALE_DAYS):
     """, (stale_days,)).fetchall()
 
 
+def find_twin_divergences(conn, groups=None):
+    """Run the twin-fund check (scripts/checks.py) on the stored closes.
+    Returns the flags, oldest first."""
+    groups = TWIN_GROUPS if groups is None else groups
+    members = sorted({m for spec in groups.values() for m in spec["members"]})
+    if not members:
+        return []
+    placeholders = ",".join("?" * len(members))
+    prices = pd.read_sql(
+        f"SELECT date, ticker, close FROM daily_prices WHERE ticker IN ({placeholders})",
+        conn, params=members,
+    )
+    if prices.empty:
+        return []
+    closes = prices.pivot(index="date", columns="ticker", values="close")
+    closes.index = pd.to_datetime(closes.index)
+    return twin_flags(closes, groups)
+
+
+def _pattern(flag):
+    """Plain-English reading of a twin flag's shape."""
+    if flag["undoes_previous"]:
+        return "catch-up day, undoes the previous day's gap"
+    if flag["reverses"] is None:
+        return "latest day, too early to tell"
+    if flag["reverses"]:
+        return "reverses next day (late or stale price)"
+    return "gap stays open (check for a missed distribution or bad adjustment)"
+
+
+def _twin_lines(flags):
+    """One report line per (group, date): who is off, by how much, and every
+    member's return that day."""
+    by_day = {}
+    for f in flags:
+        by_day.setdefault((f["group"], f["date"]), []).append(f)
+    lines = []
+    for (group, day), fs in by_day.items():
+        off = "; ".join(f"{f['ticker']} {f['deviation']:+.2%} off median "
+                        f"(limit {f['limit']:.2%}), {_pattern(f)}" for f in fs)
+        members = " ".join(f"{t} {r:+.2%}" for t, r in fs[0]["members"].items())
+        lines.append((group, day, off, members))
+    return lines
+
+
 def main(argv=None, today=None):
     parser = argparse.ArgumentParser(description="Validate the price database.")
     parser.add_argument("--db", default=DB_PATH)
@@ -116,6 +172,8 @@ def main(argv=None, today=None):
                         help="exit 1 on warnings as well as errors")
     parser.add_argument("--max-age-days", type=int, default=None)
     parser.add_argument("--recent-jump-days", type=int, default=None)
+    parser.add_argument("--twin-days", type=int, default=TWIN_DAYS,
+                        help="list twin-fund divergences from the last N days (0 = all)")
     args = parser.parse_args(argv)
     today = today or date.today()
 
@@ -124,6 +182,7 @@ def main(argv=None, today=None):
         errors = {k: v for k, v in check_errors(conn).items() if v}
         jumps = find_suspect_jumps(conn)
         stale = find_stale_tickers(conn)
+        twins = find_twin_divergences(conn)
         n_rows, n_tickers, max_date = conn.execute(
             "SELECT COUNT(*), COUNT(DISTINCT ticker), MAX(date) FROM daily_prices"
         ).fetchone()
@@ -160,11 +219,26 @@ def main(argv=None, today=None):
     for ticker, d, prev, close, change in jumps:
         print(f"  jump   {ticker:<6} {d}  {prev:>10.2f} -> {close:>10.2f}  ({change:+.0%})")
 
+    if args.twin_days > 0:
+        twin_cutoff = (today - timedelta(days=args.twin_days)).isoformat()
+        window = f"in the last {args.twin_days} days"
+    else:
+        twin_cutoff, window = "", "in the full history"
+    recent_twins = [f for f in twins if f["date"] >= twin_cutoff]
+    older_days = len({(f["group"], f["date"]) for f in twins if f["date"] < twin_cutoff})
+    twin_lines = _twin_lines(recent_twins)
+    older_note = f" (plus {older_days} older, see the README)" if older_days else ""
+    print(f"\nWARNINGS: {len(twin_lines)} twin-fund divergences {window}{older_note}")
+    for group, day, off, members in twin_lines:
+        print(f"  twin   {group}  {day}  {off}")
+        print(f"         that day: {members}")
+        annotate_warning("Twin-fund check", f"{group} {day}: {off}")
+
     print(f"\nDELISTED (history kept, not refreshed): {len(known)}")
     for ticker, d in known:
         print(f"  {ticker:<6} data ends {d}")
 
-    if errors or (args.strict and jumps):
+    if errors or (args.strict and (jumps or recent_twins)):
         return 1
     return 0
 

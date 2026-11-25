@@ -241,6 +241,8 @@ def refresh_db(db, monkeypatch):
     """Temp DB wired into refresh_prices, with sleeps removed."""
     monkeypatch.setattr(refresh_prices, "DB_PATH", db)
     monkeypatch.setattr(refresh_prices, "SLEEP", 0)
+    # Keep the repo's real fund list out of unit tests; backfill tests set their own.
+    monkeypatch.setattr(refresh_prices, "load_mutual_funds", lambda: {})
     return db
 
 
@@ -266,7 +268,7 @@ class TestRefresh:
 
         # start is the latest stored date (the anchor bar); end is today, exclusive
         assert fake.calls == [("AAA", "2026-10-09", "2026-10-13")]
-        assert result == {"inserted": 1, "restated": [], "refused": [], "trimmed": {}}
+        assert result == {"inserted": 1, "restated": [], "refused": [], "trimmed": {}, "backfilled": {}, "adjustment_issues": []}
         assert refresh_prices.get_latest_dates() == {"AAA": "2026-10-12"}
 
     def test_never_stores_today_even_if_source_returns_it(self, refresh_db, monkeypatch):
@@ -306,7 +308,7 @@ class TestRefresh:
         # Fri 10-09 is stored. Sat/Sun/Mon runs have no completed trading day to add.
         seed(refresh_db, "AAA", "2026-10-09")
         monkeypatch.setattr(refresh_prices, "fetch_yf", FakeYahoo())
-        assert refresh_prices.run(today=today) == {"inserted": 0, "restated": [], "refused": [], "trimmed": {}}
+        assert refresh_prices.run(today=today) == {"inserted": 0, "restated": [], "refused": [], "trimmed": {}, "backfilled": {}, "adjustment_issues": []}
         assert refresh_prices.get_latest_dates() == {"AAA": "2026-10-09"}
 
     def test_fetch_window_is_never_inverted(self, refresh_db, monkeypatch):
@@ -351,22 +353,35 @@ class TestRefresh:
 class TestFetchYf:
     """fetch_yf's normalisation of what yfinance returns."""
 
-    def _raw(self, closes):
+    def _raw(self, closes, adj=None, dividends=(0, 0), splits=(0, 0), gains=None,
+             volume=(500, 600)):
+        """What yf.download(auto_adjust=False, actions=True) returns: raw
+        (split-adjusted) OHLC, Adj Close, and the dividend/split records.
+        Mutual funds also get a Capital Gains column."""
         idx = pd.to_datetime(["2026-10-09", "2026-10-12"])
-        cols = pd.MultiIndex.from_product(
-            [["Close", "High", "Low", "Open", "Volume"], ["AAA"]], names=["Price", "Ticker"])
-        data = np.column_stack([closes, [11, 12], [9, 10], [10, 11], [500, 600]])
+        columns = {
+            "Adj Close": closes if adj is None else adj, "Close": closes,
+            "Dividends": list(dividends), "High": [11, 12], "Low": [9, 10],
+            "Open": [10, 11], "Stock Splits": list(splits), "Volume": list(volume),
+        }
+        if gains is not None:
+            columns["Capital Gains"] = list(gains)
+        cols = pd.MultiIndex.from_product([list(columns), ["AAA"]], names=["Price", "Ticker"])
+        data = np.column_stack([np.asarray(v, dtype=float) for v in columns.values()])
         return pd.DataFrame(data, index=idx, columns=cols)
 
     def test_flattens_columns_and_adds_keys(self, monkeypatch):
         monkeypatch.setattr(refresh_prices.yf, "download", lambda *a, **k: self._raw([10.5, 11.5]))
         df = refresh_prices.fetch_yf("AAA", "2026-10-09", "2026-10-13")
-        assert list(df.columns) == ["open", "high", "low", "close", "volume", "date", "ticker"]
+        assert list(df.columns) == ["open", "high", "low", "close", "volume", "date", "ticker",
+                                    "close_raw", "dividend", "split"]
         assert df["date"].tolist() == [date(2026, 10, 9), date(2026, 10, 12)]
         assert df["ticker"].unique().tolist() == ["AAA"]
         assert df["close"].tolist() == [10.5, 11.5]
 
-    def test_passes_dates_through_and_requests_adjusted_prices(self, monkeypatch):
+    def test_passes_dates_through_and_requests_raw_prices_with_actions(self, monkeypatch):
+        # One call returns both the adjusted series to store and the raw
+        # closes plus dividend/split records the adjustment check needs.
         seen = {}
 
         def fake_download(ticker, **kwargs):
@@ -376,7 +391,48 @@ class TestFetchYf:
         monkeypatch.setattr(refresh_prices.yf, "download", fake_download)
         refresh_prices.fetch_yf("AAA", "2026-10-09", "2026-10-13")
         assert (seen["ticker"], seen["start"], seen["end"]) == ("AAA", "2026-10-09", "2026-10-13")
-        assert seen["auto_adjust"] is True
+        assert seen["auto_adjust"] is False
+        assert seen["actions"] is True
+
+    def test_adjusts_like_yfinance_auto_adjust(self, monkeypatch):
+        # yfinance's auto_adjust scales open/high/low by Adj Close / Close and
+        # leaves volume alone; the stored rows must be exactly that.
+        raw = self._raw([10.0, 12.0], adj=[9.5, 12.0], dividends=(0, 0.5))
+        monkeypatch.setattr(refresh_prices.yf, "download", lambda *a, **k: raw)
+        df = refresh_prices.fetch_yf("AAA", "a", "b")
+        assert df["close"].tolist() == [9.5, 12.0]
+        assert df["open"].tolist() == pytest.approx([10 * 0.95, 11.0])
+        assert df["high"].tolist() == pytest.approx([11 * 0.95, 12.0])
+        assert df["low"].tolist() == pytest.approx([9 * 0.95, 10.0])
+        assert df["volume"].tolist() == [500, 600]
+        assert df["close_raw"].tolist() == [10.0, 12.0]
+        assert df["dividend"].tolist() == [0, 0.5]
+
+    def test_capital_gains_are_added_to_dividends(self, monkeypatch):
+        raw = self._raw([10.0, 12.0], dividends=(0, 0.1), gains=(0, 0.4))
+        monkeypatch.setattr(refresh_prices.yf, "download", lambda *a, **k: raw)
+        assert refresh_prices.fetch_yf("AAA", "a", "b")["dividend"].tolist() == pytest.approx([0, 0.5])
+
+    def test_mutual_fund_bars_pass_through(self, monkeypatch):
+        # Yahoo gives mutual funds open = high = low = close and volume 0.
+        raw = self._raw([10.0, 10.1], volume=(0, 0))
+        for col in ("Open", "High", "Low"):
+            raw[(col, "AAA")] = raw[("Close", "AAA")]
+        monkeypatch.setattr(refresh_prices.yf, "download", lambda *a, **k: raw)
+        df = refresh_prices.fetch_yf("AAA", "a", "b")
+        kept, rejected = store_data.validate_prices(df)
+        assert rejected == {} and len(kept) == 2
+        assert (df["volume"] == 0).all()
+        assert (df["open"] == df["close"]).all() and (df["high"] == df["low"]).all()
+
+    def test_missing_adj_close_stores_nothing(self, monkeypatch, caplog):
+        # Treating raw closes as adjusted would silently store prices that
+        # skip every dividend, so a response without Adj Close is refused.
+        # The ticker then goes stale, which the validation step reports.
+        raw = self._raw([10.5, 11.5]).drop(columns=[("Adj Close", "AAA")])
+        monkeypatch.setattr(refresh_prices.yf, "download", lambda *a, **k: raw)
+        assert refresh_prices.fetch_yf("AAA", "a", "b").empty
+        assert "Adj Close" in caplog.text
 
     def test_share_class_symbol_is_translated_for_yahoo_only(self, monkeypatch):
         seen = {}
@@ -713,7 +769,7 @@ class TestRefreshRestatement:
 
         result = refresh_prices.run(today=TODAY)
 
-        assert result == {"inserted": 0, "restated": ["AAA"], "refused": [], "trimmed": {}}
+        assert result == {"inserted": 0, "restated": ["AAA"], "refused": [], "trimmed": {}, "backfilled": {}, "adjustment_issues": []}
         stored = rows(refresh_db)
         assert [r[1] for r in stored] == HIST_DAYS
         assert [r[2] for r in stored] == pytest.approx(truth)
@@ -738,7 +794,7 @@ class TestRefreshRestatement:
         self._store(refresh_db, "AAA", truth[:50])
         source = Source(AAA=truth)
         monkeypatch.setattr(refresh_prices, "fetch_yf", source)
-        assert refresh_prices.run(today=TODAY) == {"inserted": 1, "restated": [], "refused": [], "trimmed": {}}
+        assert refresh_prices.run(today=TODAY) == {"inserted": 1, "restated": [], "refused": [], "trimmed": {}, "backfilled": {}, "adjustment_issues": []}
         assert len(source.calls) == 1                           # no full-history download
 
     def test_reused_symbol_is_refused_and_nothing_is_stored(self, refresh_db, monkeypatch):
@@ -749,7 +805,7 @@ class TestRefreshRestatement:
 
         result = refresh_prices.run(today=TODAY)
 
-        assert result == {"inserted": 0, "restated": [], "refused": ["AAA"], "trimmed": {}}
+        assert result == {"inserted": 0, "restated": [], "refused": ["AAA"], "trimmed": {}, "backfilled": {}, "adjustment_issues": []}
         assert rows(refresh_db) == before
 
     def test_one_restatement_does_not_disturb_other_tickers(self, refresh_db, monkeypatch):
@@ -757,7 +813,7 @@ class TestRefreshRestatement:
         self._store(refresh_db, "AAA", a[:50] * 4)
         self._store(refresh_db, "BBB", b[:50])
         monkeypatch.setattr(refresh_prices, "fetch_yf", Source(AAA=a, BBB=b))
-        assert refresh_prices.run(today=TODAY) == {"inserted": 1, "restated": ["AAA"], "refused": [], "trimmed": {}}
+        assert refresh_prices.run(today=TODAY) == {"inserted": 1, "restated": ["AAA"], "refused": [], "trimmed": {}, "backfilled": {}, "adjustment_issues": []}
         assert [r[2] for r in rows(refresh_db) if r[0] == "BBB"] == pytest.approx(b)
 
     def test_second_run_after_restatement_changes_nothing(self, refresh_db, monkeypatch):
@@ -766,7 +822,7 @@ class TestRefreshRestatement:
         monkeypatch.setattr(refresh_prices, "fetch_yf", Source(AAA=truth))
         refresh_prices.run(today=TODAY)
         before = rows(refresh_db)
-        assert refresh_prices.run(today=TODAY) == {"inserted": 0, "restated": [], "refused": [], "trimmed": {}}
+        assert refresh_prices.run(today=TODAY) == {"inserted": 0, "restated": [], "refused": [], "trimmed": {}, "backfilled": {}, "adjustment_issues": []}
         assert rows(refresh_db) == before
 
 
@@ -882,3 +938,246 @@ class TestTrimAfterLastValidDate:
         f = tmp_path / "d.csv"
         f.write_text("ticker,reason\nWBA,private\n")
         assert symbols.load_last_valid_dates(str(f)) == {}
+
+
+# ── Adjustment check during the refresh ───────────────────────────────────────
+class YahooSource(Source):
+    """Like Source, but serves what fetch_yf returns from a real download:
+    `close` adjusted for every dividend in the series (Yahoo re-adjusts all
+    history on each ex-date), plus the raw close and the dividend record.
+
+    adjusted=False models Yahoo listing a dividend before it has re-adjusted
+    the history; record_scale models a record that disagrees with the
+    adjustment."""
+
+    def __init__(self, raw, dividends, adjusted=True, record_scale=1.0, ticker="AAA"):
+        self.raw = np.asarray(raw, dtype=float)
+        self.div = np.asarray(dividends, dtype=float)
+        factor = np.ones(len(self.raw))
+        if adjusted:
+            for i in range(len(self.raw) - 1, 0, -1):
+                factor[:i] *= 1 - self.div[i] / self.raw[i - 1]
+        super().__init__(**{ticker: self.raw * factor})
+        self.record_scale = record_scale
+
+    def __call__(self, ticker, start, end):
+        df = super().__call__(ticker, start, end)
+        if df.empty:
+            return df
+        offset = len(HIST_DAYS) - len(self.raw)
+        idx = [HIST_DAYS.index(d.isoformat()) - offset for d in df["date"]]
+        df["close_raw"] = self.raw[idx]
+        df["dividend"] = self.div[idx] * self.record_scale
+        df["split"] = 0.0
+        return df
+
+
+class TestAdjustmentCheckInRefresh:
+    def _setup(self, db):
+        raw = walk(51)
+        div = np.zeros(51)
+        div[50] = raw[49] * 0.01                 # a 1% dividend, ex-date 10-12
+        # Stored before the ex-date: raw closes, nothing to adjust yet.
+        store_data.insert_prices(series_frame("AAA", HIST_DAYS[:50], raw[:50]), db)
+        return raw, div
+
+    def test_consistent_dividend_restates_with_no_warning(self, refresh_db, monkeypatch):
+        raw, div = self._setup(refresh_db)
+        monkeypatch.setattr(refresh_prices, "fetch_yf", YahooSource(raw, div))
+        result = refresh_prices.run(today=TODAY)
+        assert result["restated"] == ["AAA"]
+        assert result["adjustment_issues"] == []
+
+    def test_dividend_the_source_has_not_adjusted_for_is_reported(self, refresh_db, monkeypatch):
+        # The anchor still matches, so the new row is appended on the old
+        # basis; its stored return then lacks the dividend.
+        raw, div = self._setup(refresh_db)
+        monkeypatch.setattr(refresh_prices, "fetch_yf", YahooSource(raw, div, adjusted=False))
+        result = refresh_prices.run(today=TODAY)
+        assert result["inserted"] == 1, "a warning, not a gate: the row is still stored"
+        assert [(i["ticker"], i["date"]) for i in result["adjustment_issues"]] == [("AAA", "2026-10-12")]
+        issue = result["adjustment_issues"][0]
+        assert issue["implied"] - issue["stored"] == pytest.approx(0.01, abs=1e-3)
+
+    def test_adjustment_that_disagrees_with_the_record_is_reported(self, refresh_db, monkeypatch):
+        raw, div = self._setup(refresh_db)
+        monkeypatch.setattr(refresh_prices, "fetch_yf", YahooSource(raw, div, record_scale=0.5))
+        result = refresh_prices.run(today=TODAY)
+        assert result["restated"] == ["AAA"]
+        assert [i["date"] for i in result["adjustment_issues"]] == ["2026-10-12"]
+
+    def test_older_mismatches_in_a_restated_history_are_reported_too(self, refresh_db, monkeypatch):
+        raw, div = self._setup(refresh_db)
+        div[20] = raw[19] * 0.01
+        source = YahooSource(raw, div)            # history adjusted for a 1% dividend...
+        source.div[20] = raw[19] * 0.02           # ...but the record says 2%
+        monkeypatch.setattr(refresh_prices, "fetch_yf", source)
+        result = refresh_prices.run(today=TODAY)
+        assert [i["date"] for i in result["adjustment_issues"]] == [HIST_DAYS[20]]
+
+    def test_warnings_become_github_annotations(self, refresh_db, monkeypatch, capsys):
+        raw, div = self._setup(refresh_db)
+        monkeypatch.setattr(refresh_prices, "fetch_yf", YahooSource(raw, div, adjusted=False))
+        monkeypatch.setenv("GITHUB_ACTIONS", "true")
+        refresh_prices.run(today=TODAY)
+        assert "::warning title=Adjustment check::AAA 2026-10-12" in capsys.readouterr().out
+
+    def test_fakes_without_raw_columns_skip_the_check(self, refresh_db, monkeypatch):
+        seed(refresh_db, "AAA", "2026-10-09")
+        monkeypatch.setattr(refresh_prices, "fetch_yf", FakeYahoo())
+        assert refresh_prices.run(today=TODAY)["adjustment_issues"] == []
+
+
+# ── Backfilling new tickers (how the mutual funds reach production) ───────────
+def meta_rows(db):
+    return rows(db, "SELECT ticker, name, sector FROM tickers_meta ORDER BY ticker")
+
+
+class TestBackfill:
+    FUNDS = {"FUND": "Test Index Fund"}
+
+    def test_listed_fund_gets_metadata_and_full_history(self, refresh_db, monkeypatch):
+        seed(refresh_db, "AAA", "2026-10-12")
+        source = Source(FUND=walk(51))
+        monkeypatch.setattr(refresh_prices, "fetch_yf", source)
+        monkeypatch.setattr(refresh_prices, "load_mutual_funds", lambda: self.FUNDS)
+
+        result = refresh_prices.run(today=TODAY)
+
+        assert result["backfilled"] == {"FUND": 51}
+        assert ("FUND", "Test Index Fund", None) in meta_rows(refresh_db)
+        assert source.calls == [("FUND", refresh_prices.HISTORY_START, "2026-10-13")]
+        assert refresh_prices.get_latest_dates()["FUND"] == "2026-10-12"
+
+    def test_second_run_does_not_backfill_again(self, refresh_db, monkeypatch):
+        source = Source(FUND=walk(51))
+        monkeypatch.setattr(refresh_prices, "fetch_yf", source)
+        monkeypatch.setattr(refresh_prices, "load_mutual_funds", lambda: self.FUNDS)
+        refresh_prices.run(today=TODAY)
+        before = rows(refresh_db)
+        assert refresh_prices.run(today=TODAY)["backfilled"] == {}
+        assert len(source.calls) == 1 and rows(refresh_db) == before
+
+    def test_any_ticker_with_metadata_but_no_prices_is_backfilled(self, refresh_db, monkeypatch):
+        store_data.store_metadata({"ticker": "NEWETF", "name": "New ETF", "sector": None}, refresh_db)
+        monkeypatch.setattr(refresh_prices, "fetch_yf", Source(NEWETF=walk(51)))
+        assert refresh_prices.run(today=TODAY)["backfilled"] == {"NEWETF": 51}
+
+    def test_existing_metadata_is_not_overwritten(self, refresh_db, monkeypatch):
+        store_data.store_metadata({"ticker": "FUND", "name": "Old name", "sector": None}, refresh_db)
+        monkeypatch.setattr(refresh_prices, "fetch_yf", Source(FUND=walk(51)))
+        monkeypatch.setattr(refresh_prices, "load_mutual_funds", lambda: {"FUND": "New name"})
+        refresh_prices.run(today=TODAY)
+        assert meta_rows(refresh_db) == [("FUND", "Old name", None)]
+
+    def test_delisted_tickers_are_never_backfilled(self, refresh_db, monkeypatch):
+        source = Source(FUND=walk(51))
+        monkeypatch.setattr(refresh_prices, "fetch_yf", source)
+        monkeypatch.setattr(refresh_prices, "load_mutual_funds", lambda: self.FUNDS)
+        monkeypatch.setattr(refresh_prices, "load_delisted", lambda: {"FUND": "closed"})
+        assert refresh_prices.run(today=TODAY)["backfilled"] == {}
+        assert source.calls == []
+
+    def test_empty_download_is_retried_on_the_next_run(self, refresh_db, monkeypatch):
+        monkeypatch.setattr(refresh_prices, "load_mutual_funds", lambda: self.FUNDS)
+        monkeypatch.setattr(refresh_prices, "fetch_yf", Source())          # nothing yet
+        assert refresh_prices.run(today=TODAY)["backfilled"] == {}
+        monkeypatch.setattr(refresh_prices, "fetch_yf", Source(FUND=walk(51)))
+        assert refresh_prices.run(today=TODAY)["backfilled"] == {"FUND": 51}
+
+    def test_backfilled_history_is_adjustment_checked(self, refresh_db, monkeypatch):
+        raw, div = walk(51), np.zeros(51)
+        div[30] = raw[29] * 0.01
+        source = YahooSource(raw, div, record_scale=2.0, ticker="FUND")
+        monkeypatch.setattr(refresh_prices, "fetch_yf", source)
+        monkeypatch.setattr(refresh_prices, "load_mutual_funds", lambda: self.FUNDS)
+        result = refresh_prices.run(today=TODAY)
+        assert result["backfilled"] == {"FUND": 51}
+        assert [(i["ticker"], i["date"]) for i in result["adjustment_issues"]] == [("FUND", HIST_DAYS[30])]
+
+
+# ── Twin-fund check in the database report ────────────────────────────────────
+@pytest.fixture
+def twin_db(db, monkeypatch):
+    """Two funds that move together, wired up as the only twin group."""
+    closes = walk(51)
+    for t in ("AAA", "BBB"):
+        store_data.insert_prices(series_frame(t, HIST_DAYS, closes), db)
+        store_data.store_metadata({"ticker": t, "name": t, "sector": None}, db)
+    monkeypatch.setattr(validate_data, "TWIN_GROUPS", {
+        "Test pair": {"members": ["AAA", "BBB"], "tolerance": 0.001,
+                      "catches": 0.003, "why": "same index"}})
+    return db
+
+
+class TestTwinCheckInValidate:
+    TODAY = date(2026, 10, 13)
+
+    def _diverge(self, db, day):
+        """BBB misses a 1% distribution on `day`: every close from then on is 1% lower."""
+        run_sql(db, "UPDATE daily_prices SET close = close * 0.99 "
+                    f"WHERE ticker = 'BBB' AND date >= '{day}'")
+
+    def test_twins_that_agree_raise_nothing(self, twin_db, capsys):
+        assert validate_data.main(["--db", twin_db, "--strict"], today=self.TODAY) == 0
+        assert "twin " not in capsys.readouterr().out
+
+    def test_recent_divergence_is_a_warning_not_an_error(self, twin_db, capsys):
+        self._diverge(twin_db, HIST_DAYS[45])
+        assert validate_data.main(["--db", twin_db], today=self.TODAY) == 0
+        out = capsys.readouterr().out
+        assert "ERRORS: 0" in out
+        assert f"twin   Test pair  {HIST_DAYS[45]}" in out
+        assert validate_data.main(["--db", twin_db, "--strict"], today=self.TODAY) == 1
+
+    def test_old_divergence_is_counted_not_listed(self, twin_db, capsys):
+        self._diverge(twin_db, HIST_DAYS[5])
+        assert validate_data.main(["--db", twin_db], today=self.TODAY) == 0
+        out = capsys.readouterr().out
+        assert "twin   Test pair" not in out
+        assert "1 older" in out
+
+    def test_twin_days_zero_lists_the_whole_history(self, twin_db, capsys):
+        self._diverge(twin_db, HIST_DAYS[5])
+        validate_data.main(["--db", twin_db, "--twin-days", "0"], today=self.TODAY)
+        assert f"twin   Test pair  {HIST_DAYS[5]}" in capsys.readouterr().out
+
+    def test_recent_divergence_is_annotated_in_actions(self, twin_db, capsys, monkeypatch):
+        self._diverge(twin_db, HIST_DAYS[45])
+        monkeypatch.setenv("GITHUB_ACTIONS", "true")
+        validate_data.main(["--db", twin_db], today=self.TODAY)
+        assert f"::warning title=Twin-fund check::Test pair {HIST_DAYS[45]}" in capsys.readouterr().out
+
+    def test_mutual_fund_rows_pass_every_hard_check(self, clean_db):
+        # open = high = low = close and volume 0, as Yahoo serves mutual funds.
+        df = bars("FUND", ["2026-09-01", "2026-09-02"], close=50.0)
+        df["open"] = df["high"] = df["low"] = df["close"]
+        df["volume"] = 0.0
+        store_data.insert_prices(df, clean_db)
+        store_data.store_metadata({"ticker": "FUND", "name": "Fund", "sector": None}, clean_db)
+        conn = sqlite3.connect(clean_db)
+        try:
+            assert {k: v for k, v in validate_data.check_errors(conn).items() if v} == {}
+        finally:
+            conn.close()
+
+
+# ── The mutual fund list ──────────────────────────────────────────────────────
+class TestMutualFundList:
+    def test_load_mutual_funds_reads_csv(self, tmp_path):
+        f = tmp_path / "f.csv"
+        f.write_text("ticker,name\nFXAIX,Fidelity 500 Index Fund\n")
+        assert symbols.load_mutual_funds(str(f)) == {"FXAIX": "Fidelity 500 Index Fund"}
+
+    def test_missing_file_means_no_funds(self, tmp_path):
+        assert symbols.load_mutual_funds(str(tmp_path / "absent.csv")) == {}
+
+    def test_repo_fund_file_is_well_formed(self):
+        with open(symbols.MUTUAL_FUNDS_PATH, encoding="utf-8") as f:
+            lines = [l.strip() for l in f if l.strip()]
+        assert lines[0] == "ticker,name"
+        entries = [l.split(",", 1) for l in lines[1:]]
+        tickers = [t for t, _ in entries]
+        assert tickers and len(tickers) == len(set(tickers))
+        assert all(name.strip() for _, name in entries)
+        assert not set(tickers) & set(symbols.load_delisted())

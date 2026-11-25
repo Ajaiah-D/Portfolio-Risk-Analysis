@@ -4,6 +4,7 @@ import os
 
 _ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DELISTED_PATH = os.path.join(_ROOT, "tickers", "delisted.csv")
+MUTUAL_FUNDS_PATH = os.path.join(_ROOT, "tickers", "mutual_funds.csv")
 
 
 def yahoo_symbol(ticker):
@@ -30,6 +31,21 @@ def load_last_valid_dates(path=None):
     different security and the old refresh appended its prices)."""
     return {t: row["last_valid_date"] for t, row in _read(path).items()
             if (row.get("last_valid_date") or "").strip()}
+
+
+def load_mutual_funds(path=None):
+    """Return {ticker: fund name} for the index mutual funds in the universe.
+
+    The refresh gives each one a tickers_meta row and backfills its history
+    the first time it runs (see refresh_prices.backfill_new_tickers); the app
+    labels them as mutual funds. Each fund belongs to a twin group in
+    scripts/checks.py, which is how its Yahoo data gets checked.
+    """
+    path = path or MUTUAL_FUNDS_PATH
+    if not os.path.exists(path):
+        return {}
+    with open(path, newline="", encoding="utf-8") as f:
+        return {row["ticker"]: row["name"] for row in csv.DictReader(f)}
 
 
 def _read(path=None):

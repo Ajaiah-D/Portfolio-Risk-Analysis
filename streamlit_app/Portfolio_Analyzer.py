@@ -12,7 +12,7 @@ import streamlit as st
 sys.path.insert(0, ".")
 from data import helpers
 from metrics import core, optimize
-from scripts.symbols import load_delisted
+from scripts.symbols import load_delisted, load_mutual_funds
 from streamlit_app import allocation, charts, insights, interpret, style
 from streamlit_app.interpret import metric_card_html, style_asset_table, corr_cell_css
 
@@ -82,14 +82,19 @@ def load_universe():
                       + const["Symbol"].map(_suffix))
     const = const.sort_values("Symbol").reset_index(drop=True)
 
-    # ETFs (in DB but not S&P 500). SPY is offered too — it's always the
-    # benchmark, but users can also hold it as a position.
+    # ETFs and index mutual funds (in DB but not S&P 500). SPY is offered too:
+    # it's always the benchmark, but users can also hold it as a position.
+    # Mutual funds are labelled so they are not mistaken for ETFs.
     sp500_syms = set(const["Symbol"])
+    mutual_funds = load_mutual_funds()
     etf_rows = []
     for sym in sorted(db_tickers - sp500_syms):
         name = meta_dict.get(sym, sym)
-        label = (f"{sym}  —  {name}" if name and name != sym else sym) + _suffix(sym)
-        etf_rows.append({"symbol": sym, "label": label})
+        label = (f"{sym}  —  {name}" if name and name != sym else sym)
+        if sym in mutual_funds:
+            label += "  (mutual fund)"
+        etf_rows.append({"symbol": sym, "label": label + _suffix(sym),
+                         "mutual_fund": sym in mutual_funds})
     etfs = pd.DataFrame(etf_rows)
 
     sectors = sorted(const["GICS Sector"].unique().tolist())
@@ -195,14 +200,17 @@ with st.sidebar:
     selected_labels = st.multiselect(
         "Holdings",
         options=_options,
-        placeholder="Search any stock or ETF…",
+        placeholder="Search any stock, ETF or mutual fund…",
         max_selections=25,
         key="holdings_sel",
         label_visibility="collapsed",
     )
+    _n_funds = int(etfs_df["mutual_fund"].sum()) if not etfs_df.empty else 0
+    _fund_text = f", {len(etfs_df) - _n_funds} ETFs and {_n_funds} mutual funds" if _n_funds \
+        else f" and {len(etfs_df)} ETFs"
     st.caption(
-        f"Type a ticker or company name. One box covers all {len(const_df)} stocks "
-        f"and {len(etfs_df)} ETFs. SPY is always the benchmark. Add it if you want to hold it too."
+        f"Type a ticker or company name. One box covers all {len(const_df)} stocks"
+        f"{_fund_text}. SPY is always the benchmark. Add it if you want to hold it too."
     )
 
     # Symbols the user actually picked (their holdings)
